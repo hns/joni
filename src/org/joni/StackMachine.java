@@ -40,8 +40,8 @@ abstract class StackMachine extends Matcher implements StackType {
     protected byte[] stateCheckBuff; // move to int[] ?
     int stateCheckBuffSize;
 
-    protected StackMachine(Regex regex, byte[]bytes, int p , int end) {
-        super(regex, bytes, p, end);
+    protected StackMachine(Regex regex, char[] chars, int p , int end) {
+        super(regex, chars, p, end);
 
         this.stack = regex.stackNeeded ? fetchStack() : null;
         int n = regex.numRepeat + (regex.numMem << 1);

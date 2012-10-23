@@ -20,12 +20,12 @@
 package org.joni;
 
 public abstract class MatcherFactory {
-    public abstract Matcher create(Regex regex, byte[]bytes, int p, int end);
+    public abstract Matcher create(Regex regex, char[] chars, int p, int end);
 
     static final MatcherFactory DEFAULT = new MatcherFactory() {
         @Override
-        public Matcher create(Regex regex, byte[] bytes, int p, int end) {
-            return new ByteCodeMachine(regex, bytes, p, end);
+        public Matcher create(Regex regex, char[] chars, int p, int end) {
+            return new ByteCodeMachine(regex, chars, p, end);
         }
     };
 }

@@ -210,7 +210,7 @@ abstract class AsmCompilerSupport extends Compiler implements Opcodes, AsmConsta
         store(field, "I");
     }
 
-    protected final String installTemplate(byte[]arr, int p, int length) {
+    protected final String installTemplate(char[] arr, int p, int length) {
         String templateName = TEMPLATE + ++templates;
         installArray(templateName, arr, p, length);
         return templateName;
@@ -237,7 +237,7 @@ abstract class AsmCompilerSupport extends Compiler implements Opcodes, AsmConsta
         factoryInit.visitFieldInsn(PUTFIELD, factoryName, name, "[I");
     }
 
-    private void installArray(String name, byte[]arr, int p, int length) {
+    private void installArray(String name, char[]arr, int p, int length) {
         factory.visitField(ACC_PRIVATE + ACC_FINAL, name, "[B", null, null);
         factoryInit.visitVarInsn(ALOAD, THIS);          // this;
         loadInt(factoryInit, arr.length);               // this, length

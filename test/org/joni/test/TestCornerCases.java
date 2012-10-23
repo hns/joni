@@ -24,20 +24,10 @@ import org.joni.Option;
 import org.joni.Regex;
 import org.joni.Region;
 import org.joni.Syntax;
-import org.jcodings.Encoding;
-import org.jcodings.specific.ASCIIEncoding;
 
 public class TestCornerCases extends Test {
     public int option() {
         return Option.DEFAULT;
-    }
-
-    public Encoding encoding() {
-        return ASCIIEncoding.INSTANCE;
-    }
-
-    public String testEncoding() {
-        return "cp1250";
     }
 
     public Syntax syntax() {
@@ -45,10 +35,10 @@ public class TestCornerCases extends Test {
     }
 
     public void test() {
-        byte[] reg = "l.".getBytes();
-        byte[] str = "hello,lo".getBytes();
+        char[] reg = "l.".toCharArray();
+        char[] str = "hello,lo".toCharArray();
 
-        Regex p = new Regex(reg,0,reg.length,Option.DEFAULT,ASCIIEncoding.INSTANCE,Syntax.DEFAULT);
+        Regex p = new Regex(reg,0,reg.length,Option.DEFAULT,Syntax.DEFAULT);
         int result = p.matcher(str, 0, str.length).search(3, 0, Option.NONE);
         if(result != 3) {
             Config.log.println("FAIL: /l./ 'hello,lo' - with reverse, 3,0");

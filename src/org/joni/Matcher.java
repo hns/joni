@@ -22,15 +22,13 @@ package org.joni;
 
 import static org.joni.Option.isFindLongest;
 
-import org.jcodings.Encoding;
-import org.jcodings.IntHolder;
 import org.joni.constants.AnchorType;
+import org.joni.encoding.IntHolder;
 
 public abstract class Matcher extends IntHolder {
     protected final Regex regex;
-    protected final Encoding enc;
 
-    protected final byte[]bytes;
+    protected final char[] chars;
     protected final int str;
     protected final int end;
 
@@ -43,15 +41,14 @@ public abstract class Matcher extends IntHolder {
     protected int msaBegin;
     protected int msaEnd;
 
-    public Matcher(Regex regex, byte[]bytes) {
-        this(regex, bytes, 0, bytes.length);
+    public Matcher(Regex regex, char[] chars) {
+        this(regex, chars, 0, chars.length);
     }
 
-    public Matcher(Regex regex, byte[]bytes, int p, int end) {
+    public Matcher(Regex regex, char[] chars, int p, int end) {
         this.regex = regex;
-        this.enc = regex.enc;
 
-        this.bytes = bytes;
+        this.chars = chars;
         this.str = p;
         this.end = end;
 
@@ -94,7 +91,7 @@ public abstract class Matcher extends IntHolder {
             stateCheckBuffInit(end - str, offset, regex.numCombExpCheck); // move it to construction?
         } // USE_COMBINATION_EXPLOSION_CHECK
 
-        int prev = enc.prevCharHead(bytes, str, at, end);
+        int prev = EncodingHelper.prevCharHead(str, at);
 
         if (Config.USE_MATCH_RANGE_MUST_BE_INSIDE_OF_SPECIFIED_RANGE) {
             return matchAt(end /*range*/, at, prev);
@@ -104,7 +101,7 @@ public abstract class Matcher extends IntHolder {
     }
 
     int low, high; // these are the return values
-    private boolean forwardSearchRange(byte[]bytes, int str, int end, int s, int range, IntHolder lowPrev) {
+    private boolean forwardSearchRange(char[] chars, int str, int end, int s, int range, IntHolder lowPrev) {
         int pprev = -1;
         int p = s;
 
@@ -117,22 +114,17 @@ public abstract class Matcher extends IntHolder {
         }
 
         if (regex.dMin > 0) {
-            if (enc.isSingleByte()) {
-                p += regex.dMin;
-            } else {
-                int q = p + regex.dMin;
-                while (p < q && p < end) p += enc.length(bytes, p, end);
-            }
+            p += regex.dMin;
         }
 
         retry:while (true) {
-            p = regex.searchAlgorithm.search(regex, bytes, p, end, range);
+            p = regex.searchAlgorithm.search(regex, chars, p, end, range);
 
             if (p != -1 && p < range) {
                 if (p - regex.dMin < s) {
                     // retry_gate:
                     pprev = p;
-                    p += enc.length(bytes, p, end);
+                    p++;
                     continue retry;
                 }
 
@@ -140,11 +132,11 @@ public abstract class Matcher extends IntHolder {
                     switch (regex.subAnchor) {
                     case AnchorType.BEGIN_LINE:
                         if (p != str) {
-                            int prev = enc.prevCharHead(bytes, (pprev != -1) ? pprev : str, p, end);
-                            if (!enc.isNewLine(bytes, prev, end)) {
+                            int prev = EncodingHelper.prevCharHead((pprev != -1) ? pprev : str, p);
+                            if (!EncodingHelper.isNewLine(chars, prev, end)) {
                                 // goto retry_gate;
                                 pprev = p;
-                                p += enc.length(bytes, p, end);
+                                p++;
                                 continue retry;
                             }
                         }
@@ -153,19 +145,19 @@ public abstract class Matcher extends IntHolder {
                     case AnchorType.END_LINE:
                         if (p == end) {
                             if (!Config.USE_NEWLINE_AT_END_OF_STRING_HAS_EMPTY_LINE) {
-                                int prev = enc.prevCharHead(bytes, (pprev != -1) ? pprev : str, p, end);
-                                if (prev != -1 && enc.isNewLine(bytes, prev, end)) {
+                                int prev = EncodingHelper.prevCharHead((pprev != -1) ? pprev : str, p);
+                                if (prev != -1 && EncodingHelper.isNewLine(chars, prev, end)) {
                                     // goto retry_gate;
                                     pprev = p;
-                                    p += enc.length(bytes, p, end);
+                                    p++;
                                     continue retry;
                                 }
                             }
-                        } else if (!enc.isNewLine(bytes, p, end) && (!Config.USE_CRNL_AS_LINE_TERMINATOR || !enc.isMbcCrnl(bytes, p, end))) {
+                        } else if (!EncodingHelper.isNewLine(chars, p, end) && (!Config.USE_CRNL_AS_LINE_TERMINATOR || !EncodingHelper.isCrnl(chars, p, end))) {
                             //if () break;
                             // goto retry_gate;
                             pprev = p;
-                            p += enc.length(bytes, p, end);
+                            p++;
                             continue retry;
                         }
                         break;
@@ -176,9 +168,9 @@ public abstract class Matcher extends IntHolder {
                     low = p;
                     if (lowPrev != null) { // ??? // remove null checks
                         if (low > s) {
-                            lowPrev.value = enc.prevCharHead(bytes, s, p, end);
+                            lowPrev.value = EncodingHelper.prevCharHead(s, p);
                         } else {
-                            lowPrev.value = enc.prevCharHead(bytes, (pprev != -1) ? pprev : str, p, end);
+                            lowPrev.value = EncodingHelper.prevCharHead((pprev != -1) ? pprev : str, p);
                         }
                     }
                 } else {
@@ -186,13 +178,13 @@ public abstract class Matcher extends IntHolder {
                         low = p - regex.dMax;
 
                         if (low > s) {
-                            low = enc.rightAdjustCharHeadWithPrev(bytes, s, low, end, lowPrev);
+                            low = EncodingHelper.rightAdjustCharHeadWithPrev(low, lowPrev);
                             if (lowPrev != null && lowPrev.value == -1) {
-                                lowPrev.value = enc.prevCharHead(bytes, (pprev != -1) ? pprev : s, low, end);
+                                lowPrev.value = EncodingHelper.prevCharHead((pprev != -1) ? pprev : s, low);
                             }
                         } else {
                             if (lowPrev != null) {
-                                lowPrev.value = enc.prevCharHead(bytes, (pprev != -1) ? pprev : str, low, end);
+                                lowPrev.value = EncodingHelper.prevCharHead((pprev != -1) ? pprev : str, low);
                             }
                         }
                     }
@@ -216,20 +208,20 @@ public abstract class Matcher extends IntHolder {
     }
 
     // low, high
-    private boolean backwardSearchRange(byte[]bytes, int str, int end, int s, int range, int adjrange) {
+    private boolean backwardSearchRange(char[] chars, int str, int end, int s, int range, int adjrange) {
         range += regex.dMin;
         int p = s;
 
         retry:while (true) {
-            p = regex.searchAlgorithm.searchBackward(regex, bytes, range, adjrange, end, p, s, range);
+            p = regex.searchAlgorithm.searchBackward(regex, chars, range, adjrange, end, p, s, range);
 
             if (p != -1) {
                 if (regex.subAnchor != 0) {
                     switch (regex.subAnchor) {
                     case AnchorType.BEGIN_LINE:
                         if (p != str) {
-                            int prev = enc.prevCharHead(bytes, str, p, end);
-                            if (!enc.isNewLine(bytes, prev, end)) {
+                            int prev = EncodingHelper.prevCharHead(str, p);
+                            if (!EncodingHelper.isNewLine(chars, prev, end)) {
                                 p = prev;
                                 continue retry;
                             }
@@ -239,15 +231,15 @@ public abstract class Matcher extends IntHolder {
                     case AnchorType.END_LINE:
                         if (p == end) {
                             if (!Config.USE_NEWLINE_AT_END_OF_STRING_HAS_EMPTY_LINE) {
-                                int prev = enc.prevCharHead(bytes, adjrange, p, end);
+                                int prev = EncodingHelper.prevCharHead(adjrange, p);
                                 if (prev == -1) return false;
-                                if (enc.isNewLine(bytes, prev, end)) {
+                                if (EncodingHelper.isNewLine(chars, prev, end)) {
                                     p = prev;
                                     continue retry;
                                 }
                             }
-                        } else if (!enc.isNewLine(bytes, p, end) && (!Config.USE_CRNL_AS_LINE_TERMINATOR || !enc.isMbcCrnl(bytes, p, end))) {
-                            p = enc.prevCharHead(bytes, adjrange, p, end);
+                        } else if (!EncodingHelper.isNewLine(chars, p, end) && (!Config.USE_CRNL_AS_LINE_TERMINATOR || !EncodingHelper.isCrnl(chars, p, end))) {
+                            p = EncodingHelper.prevCharHead(adjrange, p);
                             if (p == -1) return false;
                             continue retry;
                         }
@@ -259,7 +251,6 @@ public abstract class Matcher extends IntHolder {
                 if (regex.dMax != MinMaxLen.INFINITE_DISTANCE) {
                     low = p - regex.dMax;
                     high = p - regex.dMin;
-                    high = enc.rightAdjustCharHead(bytes, adjrange, high, end);
                 }
 
                 if (Config.DEBUG_SEARCH) {
@@ -347,13 +338,13 @@ public abstract class Matcher extends IntHolder {
                 // !end_buf:!
                 if (endBuf(start, range, minSemiEnd, maxSemiEnd)) return -1; // mismatch_no_msa;
             } else if ((regex.anchor & AnchorType.SEMI_END_BUF) != 0) {
-                int preEnd = enc.stepBack(bytes, str, end, end, 1);
+                int preEnd = EncodingHelper.stepBack(str, end, 1);
                 maxSemiEnd = end;
-                if (enc.isNewLine(bytes, preEnd, end)) {
+                if (EncodingHelper.isNewLine(chars, preEnd, end)) {
                     minSemiEnd = preEnd;
                     if (Config.USE_CRNL_AS_LINE_TERMINATOR) {
-                        preEnd = enc.stepBack(bytes, str, preEnd, end, 1);
-                        if (preEnd != -1 && enc.isMbcCrnl(bytes, preEnd, end)) {
+                        preEnd = EncodingHelper.stepBack(str, preEnd, 1);
+                        if (preEnd != -1 && EncodingHelper.isCrnl(chars, preEnd, end)) {
                             minSemiEnd = preEnd;
                         }
                     }
@@ -410,7 +401,7 @@ public abstract class Matcher extends IntHolder {
         s = start;
         if (range > start) {    /* forward search */
             if (s > str) {
-                prev = enc.prevCharHead(bytes, str, s, end);
+                prev = EncodingHelper.prevCharHead(str, s);
             } else {
                 prev = 0; // -1
             }
@@ -429,7 +420,7 @@ public abstract class Matcher extends IntHolder {
 
                 if (regex.dMax != MinMaxLen.INFINITE_DISTANCE) {
                     do {
-                        if (!forwardSearchRange(bytes, str, end, s, schRange, this)) return mismatch(); // low, high, lowPrev
+                        if (!forwardSearchRange(chars, str, end, s, schRange, this)) return mismatch(); // low, high, lowPrev
                         if (s < low) {
                             s = low;
                             prev = value;
@@ -437,19 +428,19 @@ public abstract class Matcher extends IntHolder {
                         while (s <= high) {
                             if (matchCheck(origRange, s, prev)) return match(s); // ???
                             prev = s;
-                            s += enc.length(bytes, s, end);
+                            s++;
                         }
                     } while (s < range);
                     return mismatch();
 
                 } else { /* check only. */
-                    if (!forwardSearchRange(bytes, str, end, s, schRange, null)) return mismatch();
+                    if (!forwardSearchRange(chars, str, end, s, schRange, null)) return mismatch();
 
                     if ((regex.anchor & AnchorType.ANYCHAR_STAR) != 0) {
                         do {
                             if (matchCheck(origRange, s, prev)) return match(s);
                             prev = s;
-                            s += enc.length(bytes, s, end);
+                            s++;
                         } while (s < range);
                         return mismatch();
                     }
@@ -460,7 +451,7 @@ public abstract class Matcher extends IntHolder {
             do {
                 if (matchCheck(origRange, s, prev)) return match(s);
                 prev = s;
-                s += enc.length(bytes, s, end);
+                s++;
             } while (s < range);
 
             if (s == range) { /* because empty match with /$/. */
@@ -469,14 +460,14 @@ public abstract class Matcher extends IntHolder {
         } else { /* backward search */
             if (Config.USE_MATCH_RANGE_MUST_BE_INSIDE_OF_SPECIFIED_RANGE) {
                 if (origStart < end) {
-                    origStart += enc.length(bytes, origStart, end); // /* is upper range */
+                    origStart++; // /* is upper range */
                 }
             }
 
             if (regex.searchAlgorithm != SearchAlgorithm.NONE) {
                 int adjrange;
                 if (range < end) {
-                    adjrange = enc.leftAdjustCharHead(bytes, str, range, end);
+                    adjrange = range;
                 } else {
                     adjrange = end;
                 }
@@ -484,10 +475,10 @@ public abstract class Matcher extends IntHolder {
                     do {
                         int schStart = s + regex.dMax;
                         if (schStart > end) schStart = end;
-                        if (!backwardSearchRange(bytes, str, end, schStart, range, adjrange)) return mismatch(); // low, high
+                        if (!backwardSearchRange(chars, str, end, schStart, range, adjrange)) return mismatch(); // low, high
                         if (s > high) s = high;
                         while (s != -1 && s >= low) {
-                            prev = enc.prevCharHead(bytes, str, s, end);
+                            prev = EncodingHelper.prevCharHead(str, s);
                             if (matchCheck(origStart, s, prev)) return match(s);
                             s = prev;
                         }
@@ -504,17 +495,15 @@ public abstract class Matcher extends IntHolder {
                             schStart += regex.dMax;
                             if (schStart > end) {
                                 schStart = end;
-                            } else {
-                                schStart = enc.leftAdjustCharHead(bytes, start, schStart, end);
                             }
                         }
                     }
-                    if (!backwardSearchRange(bytes, str, end, schStart, range, adjrange)) return mismatch();
+                    if (!backwardSearchRange(chars, str, end, schStart, range, adjrange)) return mismatch();
                 }
             }
 
             do {
-                prev = enc.prevCharHead(bytes, str, s, end);
+                prev = EncodingHelper.prevCharHead(str, s);
                 if (matchCheck(origStart, s, prev)) return match(s);
                 s = prev;
             } while (s >= range);
@@ -529,10 +518,9 @@ public abstract class Matcher extends IntHolder {
         if (range > start) {
             if ((minSemiEnd - start) > regex.anchorDmax) {
                 start = minSemiEnd - regex.anchorDmax;
-                if (start < end) {
-                    start = enc.rightAdjustCharHead(bytes, str, start, end);
-                } else { /* match with empty at end */
-                    start = enc.prevCharHead(bytes, str, end, end);
+                if (start >= end) {
+                    /* match with empty at end */
+                    start = EncodingHelper.prevCharHead(str, end);
                 }
             }
             if ((maxSemiEnd - (range - 1)) < regex.anchorDmin) {
@@ -545,7 +533,6 @@ public abstract class Matcher extends IntHolder {
             }
             if ((maxSemiEnd - start) < regex.anchorDmin) {
                 start = maxSemiEnd - regex.anchorDmin;
-                start = enc.leftAdjustCharHead(bytes, str, start, end);
             }
             if (range > start) return true; // mismatch_no_msa;
         }

@@ -1,16 +1,15 @@
 package org.joni.bench;
 
-import org.jcodings.specific.ASCIIEncoding;
 import org.joni.Option;
 import org.joni.Regex;
 import org.joni.Syntax;
 
 public abstract class AbstractBench {
     protected void bench(String _reg, String _str, int warmup, int times) throws Exception {
-        byte[] reg = _reg.getBytes();
-        byte[] str = _str.getBytes();
+        char[] reg = _reg.toCharArray();
+        char[] str = _str.toCharArray();
 
-        Regex p = new Regex(reg,0,reg.length,Option.DEFAULT,ASCIIEncoding.INSTANCE,Syntax.DEFAULT);
+        Regex p = new Regex(reg,0,reg.length,Option.DEFAULT,Syntax.DEFAULT);
 
         System.err.println("::: /" + _reg + "/ =~ \"" + _str + "\", " + warmup + " * " + times + " times");
 
@@ -25,10 +24,10 @@ public abstract class AbstractBench {
     }
 
     protected void benchBestOf(String _reg, String _str, int warmup, int times) throws Exception {
-        byte[] reg = _reg.getBytes();
-        byte[] str = _str.getBytes();
+        char[] reg = _reg.toCharArray();
+        char[] str = _str.toCharArray();
 
-        Regex p = new Regex(reg,0,reg.length,Option.DEFAULT,ASCIIEncoding.INSTANCE,Syntax.DEFAULT);
+        Regex p = new Regex(reg,0,reg.length,Option.DEFAULT,Syntax.DEFAULT);
 
         System.err.println("::: /" + _reg + "/ =~ \"" + _str + "\", " + warmup + " * " + times + " times");
 

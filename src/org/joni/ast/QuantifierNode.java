@@ -199,7 +199,7 @@ public final class QuantifierNode extends StateNode {
         other.target = null; // remove target from reduced quantifier
     }
 
-    public int setQuantifier(Node tgt, boolean group, ScanEnvironment env, byte[]bytes, int p, int end) {
+    public int setQuantifier(Node tgt, boolean group, ScanEnvironment env, char[] chars, int p, int end) {
         if (lower == 1 && upper == 1) return 1;
 
         switch(tgt.getType()) {
@@ -207,8 +207,8 @@ public final class QuantifierNode extends StateNode {
         case STR:
             if (!group) {
                 StringNode sn = (StringNode)tgt;
-                if (sn.canBeSplit(env.enc)) {
-                    StringNode n = sn.splitLastChar(env.enc);
+                if (sn.canBeSplit()) {
+                    StringNode n = sn.splitLastChar();
                     if (n != null) {
                         setTarget(n);
                         return 2;
@@ -231,12 +231,12 @@ public final class QuantifierNode extends StateNode {
                         break;
 
                     case DEL:
-                        env.reg.warnings.warn(new String(bytes, p, end) +
+                        env.reg.warnings.warn(new String(chars, p, end) +
                                 " redundant nested repeat operator");
                         break;
 
                     default:
-                        env.reg.warnings.warn(new String(bytes, p, end) +
+                        env.reg.warnings.warn(new String(chars, p, end) +
                                 " nested repeat operator " + Reduce.PopularQStr[targetQNum] +
                                 " and " + Reduce.PopularQStr[nestQNum] + " was replaced with '" +
                                 Reduce.ReduceQStr[Reduce.REDUCE_TABLE[targetQNum][nestQNum].ordinal()] + "'");

@@ -19,29 +19,26 @@
  */
 package org.joni;
 
-import org.jcodings.ApplyAllCaseFoldFunction;
-import org.jcodings.Encoding;
 import org.joni.ast.CClassNode;
 import org.joni.ast.ConsAltNode;
 import org.joni.ast.StringNode;
 
-final class ApplyCaseFold implements ApplyAllCaseFoldFunction {
+final class ApplyCaseFold {
 
     // i_apply_case_fold
     public void apply(int from, int[]to, int length, Object o) {
         ApplyCaseFoldArg arg = (ApplyCaseFoldArg)o;
 
         ScanEnvironment env = arg.env;
-        Encoding enc = env.enc;
         CClassNode cc = arg.cc;
         BitSet bs = cc.bs;
 
         if (length == 1) {
-            boolean inCC = cc.isCodeInCC(enc, from);
+            boolean inCC = cc.isCodeInCC(from);
 
             if (Config.CASE_FOLD_IS_APPLIED_INSIDE_NEGATIVE_CCLASS) {
                 if ((inCC && !cc.isNot()) || (!inCC && cc.isNot())) {
-                    if (enc.minLength() > 1 || to[0] >= BitSet.SINGLE_BYTE_SIZE) {
+                    if (to[0] >= BitSet.SINGLE_BYTE_SIZE) {
                         cc.addCodeRange(env, to[0], to[0]);
                     } else {
                         /* /(?i:[^A-C])/.match("a") ==> fail. */
@@ -50,8 +47,8 @@ final class ApplyCaseFold implements ApplyAllCaseFoldFunction {
                 }
             } else {
                 if (inCC) {
-                    if (enc.minLength() > 1 || to[0] >= BitSet.SINGLE_BYTE_SIZE) {
-                        if (cc.isNot()) cc.clearNotFlag(enc);
+                    if (to[0] >= BitSet.SINGLE_BYTE_SIZE) {
+                        if (cc.isNot()) cc.clearNotFlag();
                         cc.addCodeRange(env, to[0], to[0]);
                     } else {
                         if (cc.isNot()) {
@@ -64,7 +61,7 @@ final class ApplyCaseFold implements ApplyAllCaseFoldFunction {
             } // CASE_FOLD_IS_APPLIED_INSIDE_NEGATIVE_CCLASS
 
         } else {
-            if (cc.isCodeInCC(enc, from) && (!Config.CASE_FOLD_IS_APPLIED_INSIDE_NEGATIVE_CCLASS || !cc.isNot())) {
+            if (cc.isCodeInCC(from) && (!Config.CASE_FOLD_IS_APPLIED_INSIDE_NEGATIVE_CCLASS || !cc.isNot())) {
                 StringNode node = null;
                 for (int i=0; i<length; i++) {
                     if (i == 0) {
@@ -73,7 +70,7 @@ final class ApplyCaseFold implements ApplyAllCaseFoldFunction {
                         compare with string folded at match time. */
                         node.setAmbig();
                     }
-                    node.catCode(to[i], enc);
+                    node.catCode(to[i]);
                 }
 
                 ConsAltNode alt = ConsAltNode.newAltNode(node, null);

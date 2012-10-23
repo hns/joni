@@ -19,8 +19,6 @@
  */
 package org.joni;
 
-import org.jcodings.Encoding;
-
 public final class NodeOptInfo {
     final MinMaxLen length = new  MinMaxLen();
     final OptAnchorInfo anchor = new OptAnchorInfo();
@@ -53,7 +51,7 @@ public final class NodeOptInfo {
         map.copy(other.map);
     }
 
-    public void concatLeftNode(NodeOptInfo other, Encoding enc) {
+    public void concatLeftNode(NodeOptInfo other) {
         OptAnchorInfo tanchor = new OptAnchorInfo(); // remove it somehow ?
         tanchor.concat(anchor, other.anchor, length.max, other.length.max);
         anchor.copy(tanchor);
@@ -78,16 +76,16 @@ public final class NodeOptInfo {
 
         if (other.exb.length > 0) {
             if (exbReach) {
-                exb.concat(other.exb, enc);
+                exb.concat(other.exb);
                 other.exb.clear();
             } else if (exmReach) {
-            	exm.concat(other.exb, enc);
+            	exm.concat(other.exb);
             	other.exb.clear();
             }
         }
 
-        exm.select(other.exb, enc);
-        exm.select(other.exm, enc);
+        exm.select(other.exb);
+        exm.select(other.exm);
 
         if (expr.length > 0) {
             if (other.length.max > 0) {
@@ -96,9 +94,9 @@ public final class NodeOptInfo {
                 if (otherLengthMax == MinMaxLen.INFINITE_DISTANCE) otherLengthMax = -1;
                 if (expr.length > otherLengthMax) expr.length = otherLengthMax;
                 if (expr.mmd.max == 0) {
-                    exb.select(expr, enc);
+                    exb.select(expr);
                 } else {
-                    exm.select(expr, enc);
+                    exm.select(expr);
                 }
             }
         } else if (other.expr.length > 0) {
@@ -114,7 +112,7 @@ public final class NodeOptInfo {
         exb.altMerge(other.exb, env);
         exm.altMerge(other.exm, env);
         expr.altMerge(other.expr, env);
-        map.altMerge(other.map, env.enc);
+        map.altMerge(other.map);
         length.altMerge(other.length);
     }
 

@@ -21,7 +21,6 @@ package org.joni;
 
 import static org.joni.BitStatus.bsClear;
 
-import org.jcodings.Encoding;
 import org.joni.ast.Node;
 import org.joni.exception.ErrorMessages;
 import org.joni.exception.InternalException;
@@ -32,7 +31,6 @@ public final class ScanEnvironment {
 
     int option;
     final int caseFoldFlag;
-    final public Encoding enc;
     final public Syntax syntax;
     int captureHistory;
     int btMemStart;
@@ -59,7 +57,6 @@ public final class ScanEnvironment {
         this.reg = regex;
         option = regex.options;
         caseFoldFlag = regex.caseFoldFlag;
-        enc = regex.enc;
         this.syntax = syntax;
     }
 

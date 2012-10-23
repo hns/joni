@@ -19,19 +19,15 @@
  */
 package org.joni;
 
-import org.jcodings.Encoding;
-
 // remove this one in future and pass mmd directly
 final class OptEnvironment {
     final MinMaxLen mmd = new MinMaxLen();
-    Encoding enc;
     int options;
     int caseFoldFlag;
     ScanEnvironment scanEnv;
 
     void copy(OptEnvironment other) {
         mmd.copy(other.mmd);
-        enc = other.enc;
         options = other.options;
         caseFoldFlag = other.caseFoldFlag;
         scanEnv = other.scanEnv;

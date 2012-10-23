@@ -19,15 +19,12 @@
  */
 package org.joni.test;
 
-import java.io.UnsupportedEncodingException;
-
 import org.joni.Config;
 import org.joni.Matcher;
 import org.joni.Option;
 import org.joni.Regex;
 import org.joni.Region;
 import org.joni.Syntax;
-import org.jcodings.Encoding;
 import org.joni.exception.JOniException;
 
 public abstract class Test {
@@ -38,27 +35,25 @@ public abstract class Test {
     int nfail;
 
     public abstract int option();
-    public abstract Encoding encoding();
-    public abstract String testEncoding();
     public abstract Syntax syntax();
 
-    protected String repr(byte[]bytes) {
+    protected String repr(char[] bytes) {
         return new String(bytes);
     }
 
-    protected int length(byte[]bytes) {
+    protected int length(char[] bytes) {
         return bytes.length;
     }
 
-    public void xx(byte[]pattern, byte[]str, int from, int to, int mem, boolean not) {
+    public void xx(char[]pattern, char[]str, int from, int to, int mem, boolean not) {
         xx(pattern, str, from, to, mem, not, option());
     }
 
-    public void xx(byte[]pattern, byte[]str, int from, int to, int mem, boolean not, int option) {
+    public void xx(char[] pattern, char[] str, int from, int to, int mem, boolean not, int option) {
         Regex reg;
 
         try {
-            reg = new Regex(pattern, 0, length(pattern), option, encoding(), syntax());
+            reg = new Regex(pattern, 0, length(pattern), option, syntax());
         } catch (JOniException je) {
             Config.err.println("Pattern: " + repr(pattern) + " Str: " + repr(str));
             je.printStackTrace(Config.err);
@@ -120,23 +115,23 @@ public abstract class Test {
         }
     }
 
-    protected void x2(byte[]pattern, byte[]str, int from, int to) {
+    protected void x2(char[] pattern, char[] str, int from, int to) {
         xx(pattern, str, from, to, 0, false);
     }
 
-    protected void x2(byte[]pattern, byte[]str, int from, int to, int option) {
+    protected void x2(char[] pattern, char[] str, int from, int to, int option) {
         xx(pattern, str, from, to, 0, false, option);
     }
 
-    protected void x3(byte[]pattern, byte[]str, int from, int to, int mem) {
+    protected void x3(char[] pattern, char[] str, int from, int to, int mem) {
         xx(pattern, str, from, to, mem, false);
     }
 
-    protected void n(byte[]pattern, byte[]str) {
+    protected void n(char[] pattern, char[] str) {
         xx(pattern, str, 0, 0, 0, true);
     }
 
-    protected void n(byte[]pattern, byte[]str, int option) {
+    protected void n(char[] pattern, char[] str, int option) {
         xx(pattern, str, 0, 0, 0, true, option);
     }
 
@@ -145,11 +140,7 @@ public abstract class Test {
     }
 
     public void xxs(String pattern, String str, int from, int to, int mem, boolean not, int option) {
-        try{
-            xx(pattern.getBytes(testEncoding()), str.getBytes(testEncoding()), from, to, mem, not, option);
-        } catch (UnsupportedEncodingException uee) {
-            uee.printStackTrace();
-        }
+        xx(pattern.toCharArray(), str.toCharArray(), from, to, mem, not, option);
     }
 
     public void x2s(String pattern, String str, int from, int to) {
@@ -157,11 +148,7 @@ public abstract class Test {
     }
 
     public void x2s(String pattern, String str, int from, int to, int option) {
-        try{
-        xx(pattern.getBytes(testEncoding()), str.getBytes(testEncoding()), from, to, 0, false, option);
-        } catch (UnsupportedEncodingException uee) {
-            uee.printStackTrace();
-        }
+        xx(pattern.toCharArray(), str.toCharArray(), from, to, 0, false, option);
     }
 
     public void x3s(String pattern, String str, int from, int to, int mem) {
@@ -169,11 +156,7 @@ public abstract class Test {
     }
 
     public void x3s(String pattern, String str, int from, int to, int mem, int option) {
-        try{
-            xx(pattern.getBytes(testEncoding()), str.getBytes(testEncoding()), from, to, mem, false, option);
-        } catch (UnsupportedEncodingException uee) {
-            uee.printStackTrace();
-        }
+        xx(pattern.toCharArray(), str.toCharArray(), from, to, mem, false, option);
     }
 
     public void ns(String pattern, String str) {
@@ -181,15 +164,11 @@ public abstract class Test {
     }
 
     public void ns(String pattern, String str, int option) {
-        try{
-            xx(pattern.getBytes(testEncoding()), str.getBytes(testEncoding()), 0, 0, 0, true, option);
-        } catch (UnsupportedEncodingException uee) {
-            uee.printStackTrace();
-        }
+        xx(pattern.toCharArray(), str.toCharArray(), 0, 0, 0, true, option);
     }
 
     public void printResults() {
-        Config.log.println("RESULT   SUCC: " + nsucc + ",  FAIL: " + nfail + ",  ERROR: " + nerror + " Test: " + getClass().getSimpleName() + ", Encoding: " + encoding());
+        Config.log.println("RESULT   SUCC: " + nsucc + ",  FAIL: " + nfail + ",  ERROR: " + nerror + " Test: " + getClass().getSimpleName());
     }
 
     public abstract void test();

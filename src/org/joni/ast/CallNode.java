@@ -25,7 +25,7 @@ import org.joni.UnsetAddrList;
 import org.joni.WarnCallback;
 
 public final class CallNode extends StateNode {
-    public byte[]name;
+    public char[] name;
     public int nameP;
     public int nameEnd;
 
@@ -33,7 +33,7 @@ public final class CallNode extends StateNode {
     public Node target;             // is it an EncloseNode always ?
     public UnsetAddrList unsetAddrList;
 
-    public CallNode(byte[]name, int nameP, int nameEnd, int gnum) {
+    public CallNode(char[] name, int nameP, int nameEnd, int gnum) {
         this.name = name;
         this.nameP = nameP;
         this.nameEnd = nameEnd;

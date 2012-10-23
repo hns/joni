@@ -25,7 +25,6 @@ import static org.joni.Option.isIgnoreCase;
 import static org.joni.Option.isMultiline;
 import static org.joni.ast.QuantifierNode.isRepeatInfinite;
 
-import org.jcodings.constants.CharacterType;
 import org.joni.ast.AnchorNode;
 import org.joni.ast.BackRefNode;
 import org.joni.ast.CClassNode;
@@ -42,12 +41,13 @@ import org.joni.constants.NodeType;
 import org.joni.constants.OPCode;
 import org.joni.constants.OPSize;
 import org.joni.constants.TargetInfo;
+import org.joni.encoding.CharacterType;
 
 final class ArrayCompiler extends Compiler {
-    private int[]code;
+    private int[] code;
     private int codeLength;
 
-    private byte[][]templates;
+    private char[][] templates;
     private int templateNum;
 
     ArrayCompiler(Analyser analyser) {
@@ -124,8 +124,8 @@ final class ArrayCompiler extends Compiler {
 
         if (ignoreCase) {
             switch(strLength) {
-            case 1: op = enc.toLowerCaseTable() != null ? OPCode.EXACT1_IC_SB : OPCode.EXACT1_IC; break;
-            default:op = enc.toLowerCaseTable() != null ? OPCode.EXACTN_IC_SB : OPCode.EXACTN_IC; break;
+            case 1: op = OPCode.EXACT1_IC; break;
+            default:op = OPCode.EXACTN_IC; break;
             } // switch
         } else {
             switch (mbLength) {
@@ -185,7 +185,7 @@ final class ArrayCompiler extends Compiler {
         }
     }
 
-    private int addCompileStringlength(byte[]bytes, int p, int mbLength, int strLength, boolean ignoreCase) {
+    private int addCompileStringlength(char[] chars, int p, int mbLength, int strLength, boolean ignoreCase) {
         int op = selectStrOpcode(mbLength, strLength, ignoreCase);
         int len = OPSize.OPCODE;
 
@@ -201,7 +201,7 @@ final class ArrayCompiler extends Compiler {
     }
 
     @Override
-    protected final void addCompileString(byte[]bytes, int p, int mbLength, int strLength, boolean ignoreCase) {
+    protected final void addCompileString(char[] chars, int p, int mbLength, int strLength, boolean ignoreCase) {
         int op = selectStrOpcode(mbLength, strLength, ignoreCase);
         addOpcode(op);
 
@@ -218,9 +218,9 @@ final class ArrayCompiler extends Compiler {
         if (Config.USE_STRING_TEMPLATES && opTemplated(op)) {
             addInt(templateNum);
             addInt(p);
-            addTemplate(bytes);
+            addTemplate(chars);
         } else {
-            addBytes(bytes, p, mbLength * strLength);
+            addChars(chars, p, mbLength * strLength);
         }
     }
 
@@ -232,34 +232,24 @@ final class ArrayCompiler extends Compiler {
         int p, prev;
         p = prev = sn.p;
         int end = sn.end;
-        byte[]bytes = sn.bytes;
-        int prevLen = enc.length(bytes, p, end);
-        p += prevLen;
+        char[] chars = sn.chars;
+        p++;
 
         int slen = 1;
         int rlen = 0;
 
         while (p < end) {
-            int len = enc.length(bytes, p, end);
-            if (len == prevLen) {
-                slen++;
-            } else {
-                int r = addCompileStringlength(bytes, prev, prevLen, slen, ambig);
-                rlen += r;
-                prev = p;
-                slen = 1;
-                prevLen = len;
-            }
-            p += len;
+            slen++;
+            p++;
         }
-        int r = addCompileStringlength(bytes, prev, prevLen, slen, ambig);
+        int r = addCompileStringlength(chars, prev, 1, slen, ambig);
         rlen += r;
         return rlen;
     }
 
     private int compileLengthStringRawNode(StringNode sn) {
         if (sn.length() <= 0) return 0;
-        return addCompileStringlength(sn.bytes, sn.p, 1 /*sb*/, sn.length(), false);
+        return addCompileStringlength(sn.chars, sn.p, 1 /*sb*/, sn.length(), false);
     }
 
     private void addMultiByteCClass(CodeRangeBuffer mbuf) {
@@ -274,7 +264,7 @@ final class ArrayCompiler extends Compiler {
         if (cc.mbuf == null) {
             len = OPSize.OPCODE + BitSet.BITSET_SIZE;
         } else {
-            if (enc.minLength() > 1 || cc.bs.isEmpty()) {
+            if (cc.bs.isEmpty()) {
                 len = OPSize.OPCODE;
             } else {
                 len = OPSize.OPCODE + BitSet.BITSET_SIZE;
@@ -295,13 +285,13 @@ final class ArrayCompiler extends Compiler {
 
         if (cc.mbuf == null) {
             if (cc.isNot()) {
-                addOpcode(enc.isSingleByte() ? OPCode.CCLASS_NOT_SB : OPCode.CCLASS_NOT);
+                addOpcode(OPCode.CCLASS_NOT);
             } else {
-                addOpcode(enc.isSingleByte() ? OPCode.CCLASS_SB : OPCode.CCLASS);
+                addOpcode(OPCode.CCLASS);
             }
             addInts(cc.bs.bits, BitSet.BITSET_SIZE); // add_bitset
         } else {
-            if (enc.minLength() > 1 || cc.bs.isEmpty()) {
+            if (cc.bs.isEmpty()) {
                 if (cc.isNot()) {
                     addOpcode(OPCode.CCLASS_MB_NOT);
                 } else {
@@ -328,9 +318,9 @@ final class ArrayCompiler extends Compiler {
         switch (cn.ctype) {
         case CharacterType.WORD:
             if (cn.not) {
-                op = enc.isSingleByte() ? OPCode.NOT_WORD_SB : OPCode.NOT_WORD;
+                op = OPCode.NOT_WORD;
             } else {
-                op = enc.isSingleByte() ? OPCode.WORD_SB : OPCode.WORD;
+                op = OPCode.WORD;
             }
             break;
 
@@ -344,9 +334,9 @@ final class ArrayCompiler extends Compiler {
     @Override
     protected void compileAnyCharNode() {
         if (isMultiline(regex.options)) {
-            addOpcode(enc.isSingleByte() ? OPCode.ANYCHAR_ML_SB : OPCode.ANYCHAR_ML);
+            addOpcode(OPCode.ANYCHAR_ML);
         } else {
-            addOpcode(enc.isSingleByte() ? OPCode.ANYCHAR_SB : OPCode.ANYCHAR);
+            addOpcode(OPCode.ANYCHAR);
         }
     }
 
@@ -528,28 +518,28 @@ final class ArrayCompiler extends Compiler {
             compileTreeNTimes(qn.target, qn.lower);
             if (qn.nextHeadExact != null && !cknOn(ckn)) {
                 if (isMultiline(regex.options)) {
-                    addOpcode(enc.isSingleByte() ? OPCode.ANYCHAR_ML_STAR_PEEK_NEXT_SB : OPCode.ANYCHAR_ML_STAR_PEEK_NEXT);
+                    addOpcode(OPCode.ANYCHAR_ML_STAR_PEEK_NEXT);
                 } else {
-                    addOpcode(enc.isSingleByte() ? OPCode.ANYCHAR_STAR_PEEK_NEXT_SB : OPCode.ANYCHAR_STAR_PEEK_NEXT);
+                    addOpcode(OPCode.ANYCHAR_STAR_PEEK_NEXT);
                 }
                 if (cknOn(ckn)) {
                     addStateCheckNum(ckn);
                 }
                 StringNode sn = (StringNode)qn.nextHeadExact;
-                addBytes(sn.bytes, sn.p, 1);
+                addChars(sn.chars, sn.p, 1);
                 return;
             } else {
                 if (isMultiline(regex.options)) {
                     if (cknOn(ckn)) {
-                        addOpcode(enc.isSingleByte() ? OPCode.STATE_CHECK_ANYCHAR_ML_STAR_SB : OPCode.STATE_CHECK_ANYCHAR_ML_STAR);
+                        addOpcode(OPCode.STATE_CHECK_ANYCHAR_ML_STAR);
                     } else {
-                        addOpcode(enc.isSingleByte() ? OPCode.ANYCHAR_ML_STAR_SB : OPCode.ANYCHAR_ML_STAR);
+                        addOpcode(OPCode.ANYCHAR_ML_STAR);
                     }
                 } else {
                     if (cknOn(ckn)) {
-                        addOpcode(enc.isSingleByte() ? OPCode.STATE_CHECK_ANYCHAR_STAR_SB : OPCode.STATE_CHECK_ANYCHAR_STAR);
+                        addOpcode(OPCode.STATE_CHECK_ANYCHAR_STAR);
                     } else {
-                        addOpcode(enc.isSingleByte() ? OPCode.ANYCHAR_STAR_SB : OPCode.ANYCHAR_STAR);
+                        addOpcode(OPCode.ANYCHAR_STAR);
                     }
                 }
                 if (cknOn(ckn)) {
@@ -700,18 +690,18 @@ final class ArrayCompiler extends Compiler {
             compileTreeNTimes(qn.target, qn.lower);
             if (qn.nextHeadExact != null) {
                 if (isMultiline(regex.options)) {
-                    addOpcode(enc.isSingleByte() ? OPCode.ANYCHAR_ML_STAR_PEEK_NEXT_SB : OPCode.ANYCHAR_ML_STAR_PEEK_NEXT);
+                    addOpcode(OPCode.ANYCHAR_ML_STAR_PEEK_NEXT);
                 } else {
-                    addOpcode(enc.isSingleByte() ? OPCode.ANYCHAR_STAR_PEEK_NEXT_SB : OPCode.ANYCHAR_STAR_PEEK_NEXT);
+                    addOpcode(OPCode.ANYCHAR_STAR_PEEK_NEXT);
                 }
                 StringNode sn = (StringNode)qn.nextHeadExact;
-                addBytes(sn.bytes, sn.p, 1);
+                addChars(sn.chars, sn.p, 1);
                 return;
             } else {
                 if (isMultiline(regex.options)) {
-                    addOpcode(enc.isSingleByte() ? OPCode.ANYCHAR_ML_STAR_SB : OPCode.ANYCHAR_ML_STAR);
+                    addOpcode(OPCode.ANYCHAR_ML_STAR);
                 } else {
-                    addOpcode(enc.isSingleByte() ? OPCode.ANYCHAR_STAR_SB : OPCode.ANYCHAR_STAR);
+                    addOpcode(OPCode.ANYCHAR_STAR);
                 }
                 return;
             }
@@ -744,13 +734,13 @@ final class ArrayCompiler extends Compiler {
                 if (qn.headExact != null) {
                     addOpcodeRelAddr(OPCode.PUSH_OR_JUMP_EXACT1, modTLen + OPSize.JUMP);
                     StringNode sn = (StringNode)qn.headExact;
-                    addBytes(sn.bytes, sn.p, 1);
+                    addChars(sn.chars, sn.p, 1);
                     compileTreeEmptyCheck(qn.target, emptyInfo);
                     addOpcodeRelAddr(OPCode.JUMP, -(modTLen + OPSize.JUMP + OPSize.PUSH_OR_JUMP_EXACT1));
                 } else if (qn.nextHeadExact != null) {
                     addOpcodeRelAddr(OPCode.PUSH_IF_PEEK_NEXT, modTLen + OPSize.JUMP);
                     StringNode sn = (StringNode)qn.nextHeadExact;
-                    addBytes(sn.bytes, sn.p, 1);
+                    addChars(sn.chars, sn.p, 1);
                     compileTreeEmptyCheck(qn.target, emptyInfo);
                     addOpcodeRelAddr(OPCode.JUMP, -(modTLen + OPSize.JUMP + OPSize.PUSH_IF_PEEK_NEXT));
                 } else {
@@ -985,21 +975,21 @@ final class ArrayCompiler extends Compiler {
         case AnchorType.BEGIN_POSITION:     addOpcode(OPCode.BEGIN_POSITION);       break;
 
         case AnchorType.WORD_BOUND:
-            addOpcode(enc.isSingleByte() ? OPCode.WORD_BOUND_SB : OPCode.WORD_BOUND);
+            addOpcode(OPCode.WORD_BOUND);
             break;
 
         case AnchorType.NOT_WORD_BOUND:
-            addOpcode(enc.isSingleByte() ? OPCode.NOT_WORD_BOUND_SB : OPCode.NOT_WORD_BOUND);
+            addOpcode(OPCode.NOT_WORD_BOUND);
             break;
 
         case AnchorType.WORD_BEGIN:
             if (Config.USE_WORD_BEGIN_END)
-                addOpcode(enc.isSingleByte() ? OPCode.WORD_BEGIN_SB : OPCode.WORD_BEGIN);
+                addOpcode(OPCode.WORD_BEGIN);
             break;
 
         case AnchorType.WORD_END:
             if (Config.USE_WORD_BEGIN_END)
-                addOpcode(enc.isSingleByte() ? OPCode.WORD_END_SB : OPCode.WORD_END);
+                addOpcode(OPCode.WORD_END);
             break;
 
         case AnchorType.PREC_READ:
@@ -1016,7 +1006,7 @@ final class ArrayCompiler extends Compiler {
             break;
 
         case AnchorType.LOOK_BEHIND:
-            addOpcode(enc.isSingleByte() ? OPCode.LOOK_BEHIND_SB : OPCode.LOOK_BEHIND);
+            addOpcode(OPCode.LOOK_BEHIND);
             if (node.charLength < 0) {
                 n = analyser.getCharLengthTree(node.target);
                 if (analyser.returnCode != 0) newSyntaxException(ERR_INVALID_LOOK_BEHIND_PATTERN);
@@ -1167,11 +1157,11 @@ final class ArrayCompiler extends Compiler {
         regex.operands[regex.operandLength++] = o;
     }
 
-    private void addBytes(byte[]bytes, int p ,int length) {
+    private void addChars(char[] chars, int p ,int length) {
         ensure(codeLength + length);
         int end = p + length;
 
-        while (p < end) code[codeLength++] = bytes[p++];
+        while (p < end) code[codeLength++] = chars[p++];
     }
 
     private void addInts(int[]ints, int length) {
@@ -1260,14 +1250,14 @@ final class ArrayCompiler extends Compiler {
         addOption(option);
     }
 
-    private void addTemplate(byte[]bytes) {
+    private void addTemplate(char[] chars) {
         if (templateNum == 0) {
-            templates = new byte[2][];
+            templates = new char[2][];
         } else if (templateNum == templates.length) {
-            byte[][]tmp = new byte[templateNum * 2][];
+            char[][] tmp = new char[templateNum * 2][];
             System.arraycopy(templates, 0, tmp, 0, templateNum);
             templates = tmp;
         }
-        templates[templateNum++] = bytes;
+        templates[templateNum++] = chars;
     }
 }

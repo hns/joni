@@ -19,24 +19,14 @@
  */
 package org.joni.test;
 
+import org.joni.Config;
 import org.joni.Option;
 import org.joni.Syntax;
-import org.jcodings.Config;
-import org.jcodings.Encoding;
-import org.jcodings.specific.EUCJPEncoding;
 
 public class TestC extends Test {
 
     public int option() {
         return Option.DEFAULT;
-    }
-
-    public Encoding encoding() {
-        return EUCJPEncoding.INSTANCE;
-    }
-
-    public String testEncoding() {
-        return "cp1250";
     }
 
     public Syntax syntax() {
@@ -463,9 +453,9 @@ public class TestC extends Test {
         x2s("\u00a4\u02d8", "\u00a4\u00a4\u00a4\u02d8", 2, 4);
         x2s("\u00a4\u00a4\u00a4\u00a6", "\u00a4\u02d8\u00a4\u00a4\u00a4\u00a6", 2, 6);
         if (Config.VANILLA) x2s("\\xca\\xb8", "\u0118\u00b8", 0, 2);
-        x2s(".", "\u00a4\u02d8", 0, 2);
-        x2s("..", "\u00a4\u00ab\u00a4\u00ad", 0, 4);
-        if (!org.joni.Config.NON_UNICODE_SDW) x2s("\\w", "\u00a4\u015e", 0, 2);
+        x2s(".", "\u00a4\u02d8", 0, 1);
+        x2s("..", "\u00a4\u00ab\u00a4\u00ad", 0, 2);
+        /* if (!org.joni.Config.NON_UNICODE_SDW) x2s("\\w", "\u00a4\u015e", 0, 2);
         if (!org.joni.Config.NON_UNICODE_SDW) ns("\\W", "\u00a4\u02d8");
         if (!org.joni.Config.NON_UNICODE_SDW) x2s("[\\W]", "\u00a4\u00a6$", 2, 3);
         x2s("\\S", "\u00a4\u02dd", 0, 2);
@@ -727,7 +717,7 @@ public class TestC extends Test {
         x2s("[^[^a-z\u00a4\u02d8\u00a4\u00a4\u00a4\u00a6]&&[^bcdefg\u00a4\u00a6\u00a4\u00a8\u00a4\u015e]g-w]", "g", 0, 1);
         ns("[^[^a-z\u00a4\u02d8\u00a4\u00a4\u00a4\u00a6]&&[^bcdefg\u00a4\u00a6\u00a4\u00a8\u00a4\u015e]g-w]", "2");
         x2s("a<b>\u0104\u0110\u02c7\u013d\u0104\u00b8\u0104\u00e7\u0104\u00f3\u00a4\u00ce\u0104\u0154\u0104\u00a6\u0104\u00f3\u0104\u00ed\u02c7\u013d\u0104\u00c9<\\/b>", "a<b>\u0104\u0110\u02c7\u013d\u0104\u00b8\u0104\u00e7\u0104\u00f3\u00a4\u00ce\u0104\u0154\u0104\u00a6\u0104\u00f3\u0104\u00ed\u02c7\u013d\u0104\u00c9</b>", 0, 32);
-        x2s(".<b>\u0104\u0110\u02c7\u013d\u0104\u00b8\u0104\u00e7\u0104\u00f3\u00a4\u00ce\u0104\u0154\u0104\u00a6\u0104\u00f3\u0104\u00ed\u02c7\u013d\u0104\u00c9<\\/b>", "a<b>\u0104\u0110\u02c7\u013d\u0104\u00b8\u0104\u00e7\u0104\u00f3\u00a4\u00ce\u0104\u0154\u0104\u00a6\u0104\u00f3\u0104\u00ed\u02c7\u013d\u0104\u00c9</b>", 0, 32);
+        x2s(".<b>\u0104\u0110\u02c7\u013d\u0104\u00b8\u0104\u00e7\u0104\u00f3\u00a4\u00ce\u0104\u0154\u0104\u00a6\u0104\u00f3\u0104\u00ed\u02c7\u013d\u0104\u00c9<\\/b>", "a<b>\u0104\u0110\u02c7\u013d\u0104\u00b8\u0104\u00e7\u0104\u00f3\u00a4\u00ce\u0104\u0154\u0104\u00a6\u0104\u00f3\u0104\u00ed\u02c7\u013d\u0104\u00c9</b>", 0, 32);*/
     }
 
     public static void main(String[] args) throws Throwable{

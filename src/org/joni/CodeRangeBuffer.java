@@ -19,7 +19,6 @@
  */
 package org.joni;
 
-import org.jcodings.Encoding;
 import org.joni.exception.ErrorMessages;
 import org.joni.exception.ValueException;
 
@@ -195,28 +194,27 @@ public final class CodeRangeBuffer {
     }
 
     // SET_ALL_MULTI_BYTE_RANGE
-    protected static CodeRangeBuffer setAllMultiByteRange(Encoding enc, CodeRangeBuffer pbuf) {
-        return addCodeRangeToBuff(pbuf, enc.mbcodeStartPosition(), ALL_MULTI_BYTE_RANGE);
+    protected static CodeRangeBuffer setAllMultiByteRange(CodeRangeBuffer pbuf) {
+        return addCodeRangeToBuff(pbuf, EncodingHelper.mbcodeStartPosition(), ALL_MULTI_BYTE_RANGE);
     }
 
     // ADD_ALL_MULTI_BYTE_RANGE
-    public static CodeRangeBuffer addAllMultiByteRange(Encoding enc, CodeRangeBuffer pbuf) {
-        if (!enc.isSingleByte()) return setAllMultiByteRange(enc, pbuf);
-        return pbuf;
+    public static CodeRangeBuffer addAllMultiByteRange(CodeRangeBuffer pbuf) {
+        return setAllMultiByteRange(pbuf);
     }
 
     // not_code_range_buf
-    public static CodeRangeBuffer notCodeRangeBuff(Encoding enc, CodeRangeBuffer bbuf) {
+    public static CodeRangeBuffer notCodeRangeBuff(CodeRangeBuffer bbuf) {
         CodeRangeBuffer pbuf = null;
 
-        if (bbuf == null) return setAllMultiByteRange(enc, pbuf);
+        if (bbuf == null) return setAllMultiByteRange(pbuf);
 
         int[]p = bbuf.p;
         int n = p[0];
 
-        if (n <= 0) return setAllMultiByteRange(enc, pbuf);
+        if (n <= 0) return setAllMultiByteRange(pbuf);
 
-        int pre = enc.mbcodeStartPosition();
+        int pre = EncodingHelper.mbcodeStartPosition();
 
         int from;
         int to = 0;
@@ -235,13 +233,13 @@ public final class CodeRangeBuffer {
     }
 
     // or_code_range_buf
-    public static CodeRangeBuffer orCodeRangeBuff(Encoding enc, CodeRangeBuffer bbuf1, boolean not1,
-                                                                CodeRangeBuffer bbuf2, boolean not2) {
+    public static CodeRangeBuffer orCodeRangeBuff(CodeRangeBuffer bbuf1, boolean not1,
+                                                  CodeRangeBuffer bbuf2, boolean not2) {
         CodeRangeBuffer pbuf = null;
 
         if (bbuf1 == null && bbuf2 == null) {
             if (not1 || not2) {
-                return setAllMultiByteRange(enc, pbuf);
+                return setAllMultiByteRange(pbuf);
             }
             return null;
         }
@@ -256,12 +254,12 @@ public final class CodeRangeBuffer {
 
         if (bbuf1 == null) {
             if (not1) {
-                return setAllMultiByteRange(enc, pbuf);
+                return setAllMultiByteRange(pbuf);
             } else {
                 if (!not2) {
                     return bbuf2.clone();
                 } else {
-                    return notCodeRangeBuff(enc, bbuf2);
+                    return notCodeRangeBuff(bbuf2);
                 }
             }
         }
@@ -277,7 +275,7 @@ public final class CodeRangeBuffer {
         if (!not2 && !not1) { /* 1 OR 2 */
             pbuf = bbuf2.clone();
         } else if (!not1) { /* 1 OR (not 2) */
-            pbuf = notCodeRangeBuff(enc, bbuf2);
+            pbuf = notCodeRangeBuff(bbuf2);
         }
 
         int[]p1 = bbuf1.p;

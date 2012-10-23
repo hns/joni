@@ -19,18 +19,12 @@
  */
 package org.joni.ast;
 
-import org.jcodings.CodeRange;
-import org.jcodings.Encoding;
-import org.jcodings.IntHolder;
-import org.jcodings.constants.CharacterType;
-import org.jcodings.exception.EncodingException;
-import org.jcodings.specific.ASCIIEncoding;
-import org.joni.BitSet;
-import org.joni.CodeRangeBuffer;
-import org.joni.Config;
-import org.joni.ScanEnvironment;
+import org.joni.*;
 import org.joni.constants.CCSTATE;
 import org.joni.constants.CCVALTYPE;
+import org.joni.encoding.AsciiTables;
+import org.joni.encoding.CharacterType;
+import org.joni.encoding.IntHolder;
 import org.joni.exception.ErrorMessages;
 import org.joni.exception.InternalException;
 import org.joni.exception.SyntaxException;
@@ -45,16 +39,13 @@ public final class CClassNode extends Node {
     public CodeRangeBuffer mbuf;            /* multi-byte info or NULL */
 
     private int ctype;                      // for hashing purposes
-    private Encoding enc;                   // ...
-
 
     // node_new_cclass
     public CClassNode() {}
 
-    public CClassNode(int ctype, Encoding enc, boolean not, int sbOut, int[]ranges) {
+    public CClassNode(int ctype, boolean not, int sbOut, int[]ranges) {
         this(not, sbOut, ranges);
         this.ctype = ctype;
-        this.enc = enc;
     }
 
     public void clear() {
@@ -99,7 +90,7 @@ public final class CClassNode extends Node {
     public boolean equals(Object other) {
         if (!(other instanceof CClassNode)) return false;
         CClassNode cc = (CClassNode)other;
-        return ctype == cc.ctype && isNot() == cc.isNot() && enc == cc.enc;
+        return ctype == cc.ctype && isNot() == cc.isNot();
     }
 
     @Override
@@ -107,7 +98,6 @@ public final class CClassNode extends Node {
         if (Config.USE_SHARED_CCLASS_TABLE) {
             int hash = 0;
             hash += ctype;
-            hash += enc.hashCode();
             if (isNot()) hash++;
             return hash + (hash >> 5);
         } else {
@@ -151,23 +141,21 @@ public final class CClassNode extends Node {
         mbuf = CodeRangeBuffer.addCodeRange(mbuf, env, from, to);
     }
 
-    public void addAllMultiByteRange(Encoding enc) {
-        mbuf = CodeRangeBuffer.addAllMultiByteRange(enc, mbuf);
+    public void addAllMultiByteRange() {
+        mbuf = CodeRangeBuffer.addAllMultiByteRange(mbuf);
     }
 
-    public void clearNotFlag(Encoding enc) {
+    public void clearNotFlag() {
         if (isNot()) {
             bs.invert();
 
-            if (!enc.isSingleByte()) {
-                mbuf = CodeRangeBuffer.notCodeRangeBuff(enc, mbuf);
-            }
+            mbuf = CodeRangeBuffer.notCodeRangeBuff(mbuf);
             clearNot();
         }
     }
 
     // and_cclass
-    public void and(CClassNode other, Encoding enc) {
+    public void and(CClassNode other) {
         boolean not1 = isNot();
         BitSet bsr1 = bs;
         CodeRangeBuffer buf1 = mbuf;
@@ -200,23 +188,21 @@ public final class CClassNode extends Node {
 
         CodeRangeBuffer pbuf = null;
 
-        if (!enc.isSingleByte()) {
-            if (not1 && not2) {
-                pbuf = CodeRangeBuffer.orCodeRangeBuff(enc, buf1, false, buf2, false);
-            } else {
-                pbuf = CodeRangeBuffer.andCodeRangeBuff(buf1, not1, buf2, not2);
+        if (not1 && not2) {
+            pbuf = CodeRangeBuffer.orCodeRangeBuff(buf1, false, buf2, false);
+        } else {
+            pbuf = CodeRangeBuffer.andCodeRangeBuff(buf1, not1, buf2, not2);
 
-                if (not1) {
-                    pbuf = CodeRangeBuffer.notCodeRangeBuff(enc, pbuf);
-                }
+            if (not1) {
+                pbuf = CodeRangeBuffer.notCodeRangeBuff(pbuf);
             }
-            mbuf = pbuf;
         }
+        mbuf = pbuf;
 
     }
 
     // or_cclass
-    public void or(CClassNode other, Encoding enc) {
+    public void or(CClassNode other) {
         boolean not1 = isNot();
         BitSet bsr1 = bs;
         CodeRangeBuffer buf1 = mbuf;
@@ -247,22 +233,20 @@ public final class CClassNode extends Node {
             bs.invert();
         }
 
-        if (!enc.isSingleByte()) {
-            CodeRangeBuffer pbuf = null;
-            if (not1 && not2) {
-                pbuf = CodeRangeBuffer.andCodeRangeBuff(buf1, false, buf2, false);
-            } else {
-                pbuf = CodeRangeBuffer.orCodeRangeBuff(enc, buf1, not1, buf2, not2);
-                if (not1) {
-                    pbuf = CodeRangeBuffer.notCodeRangeBuff(enc, pbuf);
-                }
+        CodeRangeBuffer pbuf = null;
+        if (not1 && not2) {
+            pbuf = CodeRangeBuffer.andCodeRangeBuff(buf1, false, buf2, false);
+        } else {
+            pbuf = CodeRangeBuffer.orCodeRangeBuff(buf1, not1, buf2, not2);
+            if (not1) {
+                pbuf = CodeRangeBuffer.notCodeRangeBuff(pbuf);
             }
-            mbuf = pbuf;
         }
+        mbuf = pbuf;
     }
 
     // add_ctype_to_cc_by_range // Encoding out!
-    public void addCTypeByRange(int ctype, boolean not, Encoding enc, int sbOut, int mbr[]) {
+    public void addCTypeByRange(int ctype, boolean not, int sbOut, int mbr[]) {
         int n = mbr[0];
 
         if (!not) {
@@ -331,8 +315,6 @@ public final class CClassNode extends Node {
     }
 
     public void addCType(int ctype, boolean not, ScanEnvironment env, IntHolder sbOut) {
-        Encoding enc = env.enc;
-
         if (Config.NON_UNICODE_SDW) {
             switch(ctype) {
             case CharacterType.D:
@@ -341,23 +323,23 @@ public final class CClassNode extends Node {
                 ctype ^= CharacterType.SPECIAL_MASK;
                 if (not) {
                     for (int c = 0; c < BitSet.SINGLE_BYTE_SIZE; c++) {
-                        if (!ASCIIEncoding.INSTANCE.isCodeCType(c, ctype)) bs.set(c);
-                        //if ((AsciiTables.AsciiCtypeTable[c] & (1 << ctype)) == 0) bs.set(c);
+                        // if (!ASCIIEncoding.INSTANCE.isCodeCType(c, ctype)) bs.set(c);
+                        if ((AsciiTables.AsciiCtypeTable[c] & (1 << ctype)) == 0) bs.set(c);
                     }
-                    addAllMultiByteRange(enc);
+                    addAllMultiByteRange();
                 } else {
                     for (int c = 0; c < BitSet.SINGLE_BYTE_SIZE; c++) {
-                        if (ASCIIEncoding.INSTANCE.isCodeCType(c, ctype)) bs.set(c);
-                        //if ((AsciiTables.AsciiCtypeTable[c] & (1 << ctype)) != 0) bs.set(c);
+                        // if (ASCIIEncoding.INSTANCE.isCodeCType(c, ctype)) bs.set(c);
+                        if ((AsciiTables.AsciiCtypeTable[c] & (1 << ctype)) != 0) bs.set(c);
                     }
                 }
                 return;
             }
         }
 
-        int[]ranges = enc.ctypeCodeRange(ctype, sbOut);
+        int[] ranges = EncodingHelper.ctypeCodeRange(ctype, sbOut);
         if (ranges != null) {
-            addCTypeByRange(ctype, not, enc, sbOut.value, ranges);
+            addCTypeByRange(ctype, not, sbOut.value, ranges);
             return;
         }
 
@@ -375,12 +357,12 @@ public final class CClassNode extends Node {
         case CharacterType.ALNUM:
             if (not) {
                 for (int c=0; c<BitSet.SINGLE_BYTE_SIZE; c++) {
-                    if (!enc.isCodeCType(c, ctype)) bs.set(c);
+                    if (!EncodingHelper.isCodeCType(c, ctype)) bs.set(c);
                 }
-                addAllMultiByteRange(enc);
+                addAllMultiByteRange();
             } else {
                 for (int c=0; c<BitSet.SINGLE_BYTE_SIZE; c++) {
-                    if (enc.isCodeCType(c, ctype)) bs.set(c);
+                    if (EncodingHelper.isCodeCType(c, ctype)) bs.set(c);
                 }
             }
             break;
@@ -389,29 +371,26 @@ public final class CClassNode extends Node {
         case CharacterType.PRINT:
             if (not) {
                 for (int c=0; c<BitSet.SINGLE_BYTE_SIZE; c++) {
-                    if (!enc.isCodeCType(c, ctype)) bs.set(c);
+                    if (!EncodingHelper.isCodeCType(c, ctype)) bs.set(c);
                 }
             } else {
                 for (int c=0; c<BitSet.SINGLE_BYTE_SIZE; c++) {
-                    if (enc.isCodeCType(c, ctype)) bs.set(c);
+                    if (EncodingHelper.isCodeCType(c, ctype)) bs.set(c);
                 }
-                addAllMultiByteRange(enc);
+                addAllMultiByteRange();
             }
             break;
 
         case CharacterType.WORD:
             if (!not) {
                 for (int c=0; c<BitSet.SINGLE_BYTE_SIZE; c++) {
-                    if (enc.isSbWord(c)) bs.set(c);
+                    if (EncodingHelper.isWord(c)) bs.set(c);
                 }
 
-                addAllMultiByteRange(enc);
+                addAllMultiByteRange();
             } else {
                 for (int c=0; c<BitSet.SINGLE_BYTE_SIZE; c++) {
-                    try {
-                        if (enc.codeToMbcLength(c) > 0 && /* check invalid code point */
-                                !enc.isWord(c)) bs.set(c);
-                    } catch (EncodingException ve) {};
+                    if (!EncodingHelper.isWord(c)) bs.set(c);
                 }
             }
             break;
@@ -508,14 +487,14 @@ public final class CClassNode extends Node {
     }
 
     // onig_is_code_in_cc_len
-    public boolean isCodeInCCLength(int encLength, int code) {
+    public boolean isCodeInCCLength(int code) {
         boolean found;
 
-        if (encLength > 1 || code >= BitSet.SINGLE_BYTE_SIZE) {
+        if (code > 0xff) {
             if (mbuf == null) {
                 found = false;
             } else {
-                found = CodeRange.isInCodeRange(mbuf.getCodeRange(), code);
+                found = EncodingHelper.isInCodeRange(mbuf.getCodeRange(), code);
             }
         } else {
             found = bs.at(code);
@@ -529,14 +508,8 @@ public final class CClassNode extends Node {
     }
 
     // onig_is_code_in_cc
-    public boolean isCodeInCC(Encoding enc, int code) {
-        int len;
-        if (enc.minLength() > 1) {
-            len = 2;
-        } else {
-            len = enc.codeToMbcLength(code);
-        }
-        return isCodeInCCLength(len, code);
+    public boolean isCodeInCC(int code) {
+         return isCodeInCCLength(code);
     }
 
     public void setNot() {

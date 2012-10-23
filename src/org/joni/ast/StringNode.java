@@ -19,8 +19,7 @@
  */
 package org.joni.ast;
 
-import org.jcodings.Encoding;
-import org.joni.Config;
+import org.joni.EncodingHelper;
 import org.joni.constants.StringType;
 
 public final class StringNode extends Node implements StringType {
@@ -29,26 +28,26 @@ public final class StringNode extends Node implements StringType {
     private static final int NODE_STR_BUF_SIZE = 24;
     public static final StringNode EMPTY = new StringNode(null, Integer.MAX_VALUE, Integer.MAX_VALUE);
 
-    public byte[]bytes;
+    public char[] chars;
     public int p;
     public int end;
 
     public int flag;
 
     public StringNode() {
-        this.bytes = new byte[NODE_STR_BUF_SIZE];
+        this.chars = new char[NODE_STR_BUF_SIZE];
     }
 
-    public StringNode(byte[]bytes, int p, int end) {
-        this.bytes = bytes;
+    public StringNode(char[] chars, int p, int end) {
+        this.chars = chars;
         this.p = p;
         this.end = end;
         setShared();
     }
 
-    public StringNode(byte c) {
+    public StringNode(char c) {
         this();
-        bytes[end++] = c;
+        chars[end++] = c;
     }
 
     /* Ensure there is ahead bytes available in node's buffer
@@ -56,10 +55,10 @@ public final class StringNode extends Node implements StringType {
      */
     public void ensure(int ahead) {
         int len = (end - p) + ahead;
-        if (len >= bytes.length) {
-            byte[]tmp = new byte[len + NODE_STR_MARGIN];
-            System.arraycopy(bytes, p, tmp, 0, end - p);
-            bytes = tmp;
+        if (len >= chars.length) {
+            char[] tmp = new char[len + NODE_STR_MARGIN];
+            System.arraycopy(chars, p, tmp, 0, end - p);
+            chars = tmp;
         }
     }
 
@@ -68,9 +67,9 @@ public final class StringNode extends Node implements StringType {
     private void modifyEnsure(int ahead) {
         if (isShared()) {
             int len = (end - p) + ahead;
-            byte[]tmp = new byte[len + NODE_STR_MARGIN];
-            System.arraycopy(bytes, p, tmp, 0, end - p);
-            bytes = tmp;
+            char[] tmp = new char[len + NODE_STR_MARGIN];
+            System.arraycopy(chars, p, tmp, 0, end - p);
+            chars = tmp;
             end = end - p;
             p = 0;
             clearShared();
@@ -94,10 +93,10 @@ public final class StringNode extends Node implements StringType {
         StringBuilder value = new StringBuilder();
         value.append("\n  bytes: '");
         for (int i=p; i<end; i++) {
-            if ((bytes[i] & 0xff) >= 0x20 && (bytes[i] & 0xff) < 0x7f) {
-                value.append((char)bytes[i]);
+            if (chars[i] >= 0x20 && chars[i] < 0x7f) {
+                value.append(chars[i]);
             } else {
-                value.append(String.format("[0x%02x]", bytes[i]));
+                value.append(String.format("[0x%04x]", chars[i]));
             }
         }
         value.append("'");
@@ -108,17 +107,13 @@ public final class StringNode extends Node implements StringType {
         return end - p;
     }
 
-    public int length(Encoding enc) {
-        return enc.strLength(bytes, p, end);
-    }
-
-    public StringNode splitLastChar(Encoding enc) {
+    public StringNode splitLastChar() {
         StringNode n = null;
 
         if (end > p) {
-            int prev = enc.prevCharHead(bytes, p, end, end);
+            int prev = EncodingHelper.prevCharHead(p, end);
             if (prev != -1 && prev > p) { /* can be splitted. */
-                n = new StringNode(bytes, prev, end);
+                n = new StringNode(chars, prev, end);
                 if (isRaw()) n.setRaw();
                 end = prev;
             }
@@ -126,39 +121,38 @@ public final class StringNode extends Node implements StringType {
         return n;
     }
 
-    public boolean canBeSplit(Encoding enc) {
+    public boolean canBeSplit() {
         if (end > p) {
-            return enc.length(bytes, p, end) < (end - p);
+            return 1 < (end - p);
         }
         return false;
     }
 
-    public void set(byte[]bytes, int p, int end) {
-        this.bytes = bytes;
+    public void set(char[] chars, int p, int end) {
+        this.chars = chars;
         this.p = p;
         this.end = end;
         setShared();
     }
 
-    public void cat(byte[]cat, int catP, int catEnd) {
+    public void cat(char[] cat, int catP, int catEnd) {
         int len = catEnd - catP;
         modifyEnsure(len);
-        System.arraycopy(cat, catP, bytes, end, len);
+        System.arraycopy(cat, catP, chars, end, len);
         end += len;
     }
 
-    public void cat(byte c) {
+    public void cat(char c) {
         modifyEnsure(1);
-        bytes[end++] = c;
+        chars[end++] = c;
     }
 
-    public void catCode(int code, Encoding enc) {
-        ensure(Config.ENC_CODE_TO_MBC_MAXLEN);
-        end += enc.codeToMbc(code, bytes, end);
+    public void catCode(int code) {
+        cat((char)code);
     }
 
     public void clear() {
-        if (bytes.length > NODE_STR_BUF_SIZE) bytes = new byte[NODE_STR_BUF_SIZE];
+        if (chars.length > NODE_STR_BUF_SIZE) chars = new char[NODE_STR_BUF_SIZE];
         flag = 0;
         p = end = 0;
     }

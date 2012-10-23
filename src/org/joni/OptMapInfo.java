@@ -19,9 +19,6 @@
  */
 package org.joni;
 
-import org.jcodings.CaseFoldCodeItem;
-import org.jcodings.Encoding;
-
 final class OptMapInfo {
 
     final MinMaxLen mmd = new MinMaxLen();          /* info position */
@@ -45,24 +42,22 @@ final class OptMapInfo {
         System.arraycopy(other.map, 0, map, 0, other.map.length);
     }
 
-    void addChar(byte c, Encoding enc) {
+    void addChar(int c) {
         int c_ = c & 0xff;
         if (map[c_] == 0) {
             map[c_] = 1;
-            value += positionValue(enc, c_);
+            value += positionValue(c_);
         }
     }
 
-    void addCharAmb(byte[]bytes, int p, int end, Encoding enc, int caseFoldFlag) {
-        addChar(bytes[p], enc);
+    void addCharAmb(char[] chars, int p, int end, int caseFoldFlag) {
+        addChar(chars[p]);
 
         caseFoldFlag &= ~Config.INTERNAL_ENC_CASE_FOLD_MULTI_CHAR;
-        CaseFoldCodeItem[]items = enc.caseFoldCodesByString(caseFoldFlag, bytes, p, end);
+        char[]items = EncodingHelper.caseFoldCodesByString(caseFoldFlag, chars[p]);
 
-        byte[] buf = new byte[Config.ENC_CODE_TO_MBC_MAXLEN];
         for (int i=0; i<items.length; i++) {
-            enc.codeToMbc(items[i].code[0], buf, 0);
-            addChar(buf[0], enc);
+            addChar(items[i]);
         }
     }
 
@@ -82,7 +77,7 @@ final class OptMapInfo {
     }
 
     // alt_merge_opt_map_info
-    void altMerge(OptMapInfo other, Encoding enc) {
+    void altMerge(OptMapInfo other) {
         /* if (! is_equal_mml(&to->mmd, &add->mmd)) return ; */
         if (value == 0) return;
         if (other.value == 0 || mmd.max < other.mmd.max) {
@@ -95,7 +90,7 @@ final class OptMapInfo {
         int val = 0;
         for (int i=0; i<Config.CHAR_TABLE_SIZE; i++) {
             if (other.map[i] != 0) map[i] = 1;
-            if (map[i] != 0) val += positionValue(enc, i);
+            if (map[i] != 0) val += positionValue(i);
         }
 
         value = val;
@@ -114,13 +109,9 @@ final class OptMapInfo {
      };
 
     // map_position_value
-    static int positionValue(Encoding enc, int i) {
+    static int positionValue(int i) {
         if (i < ByteValTable.length) {
-            if (i == 0 && enc.minLength() > 1) {
-                return 20;
-            } else {
-                return ByteValTable[i];
-            }
+            return ByteValTable[i];
         } else {
             return 4; /* Take it easy. */
         }

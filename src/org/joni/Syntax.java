@@ -603,4 +603,26 @@ public final class Syntax implements SyntaxProperties{
             INEFFECTIVE_META_CHAR          /* anychar anytime */
         )
     );
+
+    public static final Syntax JAVASCRIPT = new Syntax(
+        (( GNU_REGEX_OP | OP_QMARK_NON_GREEDY |
+        OP_ESC_CONTROL_CHARS | OP_ESC_C_CONTROL | OP_ESC_X_HEX2)
+        & ~OP_ESC_LTGT_WORD_BEGIN_END ),
+
+        ( OP2_QMARK_GROUP_EFFECT | OP2_CCLASS_SET_OP |
+        OP2_ESC_V_VTAB | OP2_ESC_U_HEX4 ),
+
+        ( GNU_REGEX_BV | DIFFERENT_LEN_ALT_LOOK_BEHIND ),
+
+        Option.SINGLELINE,
+
+        new MetaCharTable(
+            '\\',                          /* esc */
+            INEFFECTIVE_META_CHAR,         /* anychar '.' */
+            INEFFECTIVE_META_CHAR,         /* anytime '*' */
+            INEFFECTIVE_META_CHAR,         /* zero or one time '?' */
+            INEFFECTIVE_META_CHAR,         /* one or more time '+' */
+            INEFFECTIVE_META_CHAR          /* anychar anytime */
+        )
+    );
 }

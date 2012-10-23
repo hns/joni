@@ -21,8 +21,15 @@ package org.joni;
 
 import java.io.PrintStream;
 
-public interface Config extends org.jcodings.Config {
+public interface Config {
     final int CHAR_TABLE_SIZE = 256;
+
+    /* from jcodings */
+    final boolean VANILLA = false;
+    final int INTERNAL_ENC_CASE_FOLD_MULTI_CHAR = (1<<30);
+    final int ENC_CASE_FOLD_MIN = INTERNAL_ENC_CASE_FOLD_MULTI_CHAR;
+    final int ENC_CASE_FOLD_DEFAULT = ENC_CASE_FOLD_MIN;
+    final boolean USE_CRNL_AS_LINE_TERMINATOR = false;
 
     final boolean USE_NAMED_GROUP = true;
     final boolean USE_SUBEXP_CALL = true;
@@ -73,7 +80,7 @@ public interface Config extends org.jcodings.Config {
     final int CHECK_STRING_THRESHOLD_LEN            = 7;
     final int CHECK_BUFF_MAX_SIZE                   = 0x4000;
 
-    final boolean NON_UNICODE_SDW                   = true;
+    final boolean NON_UNICODE_SDW                   = false;
 
 
     final PrintStream log = System.out;

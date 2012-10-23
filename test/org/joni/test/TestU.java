@@ -21,8 +21,6 @@ package org.joni.test;
 
 import org.joni.Option;
 import org.joni.Syntax;
-import org.jcodings.Encoding;
-import org.jcodings.specific.UTF16BEEncoding;
 
 public class TestU extends Test {
 
@@ -30,20 +28,8 @@ public class TestU extends Test {
         return Option.DEFAULT;
     }
 
-    public Encoding encoding() {
-        return UTF16BEEncoding.INSTANCE;
-    }
-
-    public String testEncoding() {
-        return "iso-8859-1";
-    }
-
     public Syntax syntax() {
         return Syntax.DEFAULT;
-    }
-
-    private int ulen(byte[]bytes) {
-        return encoding().strByteLengthNull(bytes, 0, bytes.length);
     }
 
     private String uconv(byte []bytes, int len) {
@@ -67,14 +53,6 @@ public class TestU extends Test {
         }
 
         return sb.toString();
-    }
-
-    protected String repr(byte[]bytes) {
-        return uconv(bytes, ulen(bytes));
-    }
-
-    protected int length(byte[]bytes) {
-        return ulen(bytes);
     }
 
     public void test() {

@@ -19,7 +19,6 @@
  */
 package org.joni;
 
-import org.jcodings.Encoding;
 import org.joni.ast.AnchorNode;
 import org.joni.ast.BackRefNode;
 import org.joni.ast.CClassNode;
@@ -37,13 +36,11 @@ import org.joni.exception.SyntaxException;
 
 abstract class Compiler implements ErrorMessages {
     protected final Analyser analyser;
-    protected final Encoding enc;
     protected final Regex regex;
 
     protected Compiler(Analyser analyser) {
         this.analyser = analyser;
         this.regex = analyser.regex;
-        this.enc = regex.enc;
     }
 
     final void compile() {
@@ -59,7 +56,7 @@ abstract class Compiler implements ErrorMessages {
 
     private void compileStringRawNode(StringNode sn) {
         if (sn.length() <= 0) return;
-        addCompileString(sn.bytes, sn.p, 1 /*sb*/, sn.length(), false);
+        addCompileString(sn.chars, sn.p, 1 /*sb*/, sn.length(), false);
     }
 
     private void compileStringNode(StringNode node) {
@@ -71,27 +68,18 @@ abstract class Compiler implements ErrorMessages {
         int p, prev;
         p = prev = sn.p;
         int end = sn.end;
-        byte[]bytes = sn.bytes;
-        int prevLen = enc.length(bytes, p, end);
-        p += prevLen;
+        char[] chars = sn.chars;
+        p++;
         int slen = 1;
 
         while (p < end) {
-            int len = enc.length(bytes, p, end);
-            if (len == prevLen) {
-                slen++;
-            } else {
-                addCompileString(bytes, prev, prevLen, slen, ambig);
-                prev = p;
-                slen = 1;
-                prevLen = len;
-            }
-            p += len;
+            slen++;
+            p++;
         }
-        addCompileString(bytes, prev, prevLen, slen, ambig);
+        addCompileString(chars, prev, 1, slen, ambig);
     }
 
-    protected abstract void addCompileString(byte[]bytes, int p, int mbLength, int strLength, boolean ignoreCase);
+    protected abstract void addCompileString(char[] chars, int p, int mbLength, int strLength, boolean ignoreCase);
 
     protected abstract void compileCClassNode(CClassNode node);
     protected abstract void compileCTypeNode(CTypeNode node);

@@ -21,9 +21,15 @@ package org.joni.exception;
 
 import org.joni.Config;
 
-public interface ErrorMessages extends org.jcodings.exception.ErrorMessages {
+public interface ErrorMessages {
     final String MISMATCH = "mismatch";
     final String NO_SUPPORT_CONFIG = "no support in this configuration";
+
+    /* from jcodings */
+    final String ERR_INVALID_CHAR_PROPERTY_NAME = "invalid character property name <%n>";
+    final String ERR_INVALID_CODE_POINT_VALUE = "invalid code point value";
+    final String ERR_TOO_BIG_WIDE_CHAR_VALUE = "too big wide-char value";
+    final String ERR_TOO_LONG_WIDE_CHAR_VALUE = "too long wide-char value";
 
     /* internal error */
     final String ERR_MEMORY = "fail to memory allocation";

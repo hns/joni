@@ -22,7 +22,7 @@ package org.joni;
 public final class NameEntry {
     static final int INIT_NAME_BACKREFS_ALLOC_NUM = 8;
 
-    public final byte[]name;
+    public final char[] name;
     public final int nameP;
     public final int nameEnd;
 
@@ -30,8 +30,8 @@ public final class NameEntry {
     int backRef1;
     int backRefs[];
 
-    public NameEntry(byte[]bytes, int p, int end) {
-        name = bytes;
+    public NameEntry(char[] chars, int p, int end) {
+        name = chars;
         nameP = p;
         nameEnd = end;
     }

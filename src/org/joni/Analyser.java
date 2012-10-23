@@ -34,10 +34,6 @@ import static org.joni.ast.QuantifierNode.isRepeatInfinite;
 
 import java.util.HashSet;
 
-import org.jcodings.CaseFoldCodeItem;
-import org.jcodings.ObjPtr;
-import org.jcodings.Ptr;
-import org.jcodings.constants.CharacterType;
 import org.joni.ast.AnchorNode;
 import org.joni.ast.BackRefNode;
 import org.joni.ast.CClassNode;
@@ -54,18 +50,21 @@ import org.joni.constants.NodeType;
 import org.joni.constants.RegexState;
 import org.joni.constants.StackPopLevel;
 import org.joni.constants.TargetInfo;
+import org.joni.encoding.CharacterType;
+import org.joni.encoding.ObjPtr;
+import org.joni.encoding.Ptr;
 
 final class Analyser extends Parser {
 
-    protected Analyser(ScanEnvironment env, byte[]bytes, int p, int end) {
-        super(env, bytes, p, end);
+    protected Analyser(ScanEnvironment env, char[] chars, int p, int end) {
+        super(env, chars, p, end);
     }
 
     protected final void compile() {
         regex.state = RegexState.COMPILING;
 
         if (Config.DEBUG) {
-            Config.log.println(regex.encStringToString(bytes, getBegin(), getEnd()));
+            Config.log.println(new String(chars, getBegin(), getEnd()));
         }
 
         reset();
@@ -530,12 +529,12 @@ final class Analyser extends Parser {
             break;
 
         case NodeType.CTYPE:
-            max = enc.maxLengthDistance();
+            max = 1;
             break;
 
         case NodeType.CCLASS:
         case NodeType.CANY:
-            max = enc.maxLengthDistance();
+            max = 1;
             break;
 
         case NodeType.BREF:
@@ -655,7 +654,7 @@ final class Analyser extends Parser {
 
         case NodeType.STR:
             StringNode sn = (StringNode)node;
-            len = sn.length(enc);
+            len = sn.length();
             break;
 
         case NodeType.QTFR:
@@ -768,7 +767,7 @@ final class Analyser extends Parser {
                         if (xc.mbuf == null && !xc.isNot()) {
                             for (int i=0; i<BitSet.SINGLE_BYTE_SIZE; i++) {
                                 if (xc.bs.at(i)) {
-                                    if (enc.isSbWord(i)) return false;
+                                    if (EncodingHelper.isWord(i)) return false;
                                 }
                             }
                             return true;
@@ -776,7 +775,7 @@ final class Analyser extends Parser {
                         return false;
                     } else {
                         for (int i=0; i<BitSet.SINGLE_BYTE_SIZE; i++) {
-                            if (!enc.isSbWord(i)) {
+                            if (!EncodingHelper.isWord(i)) {
                                 if (!xc.isNot()) {
                                     if (xc.bs.at(i)) return false;
                                 } else {
@@ -829,11 +828,7 @@ final class Analyser extends Parser {
                 CTypeNode cy = ((CTypeNode)y);
                 switch (cy.ctype) {
                 case CharacterType.WORD:
-                    if (enc.isMbcWord(xs.bytes, xs.p, xs.end)) {
-                        return cy.not;
-                    } else {
-                        return !cy.not;
-                    }
+                    return !cy.not;
 
                 default:
                     break;
@@ -843,8 +838,8 @@ final class Analyser extends Parser {
 
             case NodeType.CCLASS:
                 CClassNode cc = (CClassNode)y;
-                int code = enc.mbcToCode(xs.bytes, xs.p, xs.p + enc.maxLength());
-                return !cc.isCodeInCC(enc, code);
+                int code = xs.chars[xs.p];
+                return !cc.isCodeInCC(code);
 
             case NodeType.STR:
                 StringNode ys = (StringNode)y;
@@ -855,7 +850,7 @@ final class Analyser extends Parser {
                     return false;
                 } else {
                     for (int i=0, p=ys.p, q=xs.p; i<len; i++, p++, q++) {
-                        if (ys.bytes[p] != xs.bytes[q]) return true;
+                        if (ys.chars[p] != xs.chars[q]) return true;
                     }
                 }
                 break;
@@ -1363,7 +1358,7 @@ final class Analyser extends Parser {
                 if (Config.USE_QTFR_PEEK_NEXT) {
                     StringNode n = (StringNode)getHeadValueNode(nextNode, true);
                     /* '\0': for UTF-16BE etc... */
-                    if (n != null && n.bytes[n.p] != 0) { // ?????????
+                    if (n != null && n.chars[n.p] != 0) { // ?????????
                         qn.nextHeadExact = n;
                     }
                 } // USE_QTFR_PEEK_NEXT
@@ -1398,77 +1393,45 @@ final class Analyser extends Parser {
         } // while
     }
 
-    private void updateStringNodeCaseFoldSingleByte(StringNode sn, byte[]toLower) {
-        int end = sn.end;
-        byte[]bytes = sn.bytes;
-        int sp = 0;
-        int p = sn.p;
-
-        while (p < end) {
-            byte lower = toLower[bytes[p] & 0xff];
-            if (lower != bytes[p]) {
-                byte[]sbuf = new byte[end - sn.p];
-                System.arraycopy(bytes, sn.p, sbuf, 0, sp);
-
-                while (p < end) sbuf[sp++] = toLower[bytes[p++] & 0xff];
-
-                sn.set(sbuf, 0, sp);
-                break;
-            } else {
-                sp++;
-                p++;
-            }
-        }
-    }
-
     private void updateStringNodeCaseFoldMultiByte(StringNode sn) {
-        byte[]bytes = sn.bytes;
+        char[] chars = sn.chars;
         int end = sn.end;
         value = sn.p;
         int sp = 0;
-        byte[]buf = new byte[Config.ENC_MBC_CASE_FOLD_MAXLEN];
+        char buf;
 
         while (value < end) {
             int ovalue = value;
-            int len = enc.mbcCaseFold(regex.caseFoldFlag, bytes, this, end, buf);
+            buf = Character.toLowerCase(chars[value++]);
 
-            for (int i = 0; i < len; i++) {
-                if (bytes[ovalue + i] != buf[i]) {
+            if (chars[ovalue] != buf) {
 
-                    byte[]sbuf = new byte[sn.length() << 1];
-                    System.arraycopy(bytes, sn.p, sbuf, 0, ovalue - sn.p);
-                    value = ovalue;
-                    while (value < end) {
-                        len = enc.mbcCaseFold(regex.caseFoldFlag, bytes, this, end, buf);
-                        for (i = 0; i < len; i++) {
-                            if (sp >= sbuf.length) {
-                                byte[]tmp = new byte[sbuf.length << 1];
-                                System.arraycopy(sbuf, 0, tmp, 0, sbuf.length);
-                                sbuf = tmp;
-                            }
-                            sbuf[sp++] = buf[i];
-                        }
+                char[] sbuf = new char[sn.length() << 1];
+                System.arraycopy(chars, sn.p, sbuf, 0, ovalue - sn.p);
+                value = ovalue;
+                while (value < end) {
+                    buf = Character.toLowerCase(chars[value++]);
+                    if (sp >= sbuf.length) {
+                        char[]tmp = new char[sbuf.length << 1];
+                        System.arraycopy(sbuf, 0, tmp, 0, sbuf.length);
+                        sbuf = tmp;
                     }
-                    sn.set(sbuf, 0, sp);
-                    return;
+                    sbuf[sp++] = buf;
                 }
-                sp++;
+                sn.set(sbuf, 0, sp);
+                return;
             }
+            sp++;
         }
     }
 
     private void updateStringNodeCaseFold(Node node) {
         StringNode sn = (StringNode)node;
-        byte[] toLower = enc.toLowerCaseTable();
-        if (toLower != null) {
-            updateStringNodeCaseFoldSingleByte(sn, toLower);
-        } else {
-            updateStringNodeCaseFoldMultiByte(sn);
-        }
+        updateStringNodeCaseFoldMultiByte(sn);
     }
 
-    private Node expandCaseFoldMakeRemString(byte[]bytes, int p, int end) {
-        StringNode node = new StringNode(bytes, p, end);
+    private Node expandCaseFoldMakeRemString(char[] chars, int p, int end) {
+        StringNode node = new StringNode(chars, p, end);
 
         updateStringNodeCaseFold(node);
         node.setAmbig();
@@ -1476,58 +1439,26 @@ final class Analyser extends Parser {
         return node;
     }
 
-    private boolean expandCaseFoldStringAlt(int itemNum, CaseFoldCodeItem[]items,
-                                              byte[]bytes, int p, int slen, int end, ObjPtr<Node> node) {
-        boolean varlen = false;
-        for (int i=0; i<itemNum; i++) {
-            if (items[i].byteLen != slen) {
-                varlen = true;
-                break;
-            }
-        }
+    private boolean expandCaseFoldStringAlt(int itemNum, char[] items,
+                                              char[] chars, int p, int slen, int end, ObjPtr<Node> node) {
 
-        ConsAltNode varANode = null, altNode, listNode;
-        if (varlen) {
-            node.p = varANode = newAltNode(null, null);
+        ConsAltNode altNode;
+        node.p = altNode = newAltNode(null, null);
 
-            listNode = newListNode(null, null);
-            varANode.setCar(listNode);
-
-            altNode = newAltNode(null, null);
-            listNode.setCar(altNode);
-        } else {
-            node.p = altNode = newAltNode(null, null);
-        }
-
-        StringNode snode = new StringNode(bytes, p, p + slen);
+        StringNode snode = new StringNode(chars, p, p + slen);
         altNode.setCar(snode);
 
         for (int i=0; i<itemNum; i++) {
             snode = new StringNode();
 
-            for (int j = 0; j < items[i].codeLen; j++) snode.catCode(items[i].code[j], enc);
+            snode.catCode(items[i]);
 
             ConsAltNode an = newAltNode(null, null);
-            if (items[i].byteLen != slen) {
-                int q = p + items[i].byteLen;
-                if (q < end) {
-                    Node rem = expandCaseFoldMakeRemString(bytes, q, end);
-
-                    listNode = ConsAltNode.listAdd(null, snode);
-                    ConsAltNode.listAdd(listNode, rem);
-                    an.setCar(listNode);
-                } else {
-                    an.setCar(snode);
-                }
-                varANode.setCdr(an);
-                varANode = an;
-            } else {
-                an.setCar(snode);
-                altNode.setCdr(an);
-                altNode = an;
-            }
+            an.setCar(snode);
+            altNode.setCdr(an);
+            altNode = an;
         }
-        return varlen;
+        return false;
     }
 
     private static final int THRESHOLD_CASE_FOLD_ALT_FOR_EXPANSION = 8;
@@ -1536,7 +1467,7 @@ final class Analyser extends Parser {
 
         if (sn.isAmbig() || sn.length() <= 0) return node;
 
-        byte[]bytes = sn.bytes;
+        char[] chars = sn.chars;
         int p = sn.p;
         int end = sn.end;
         int altNum = 1;
@@ -1546,8 +1477,7 @@ final class Analyser extends Parser {
         StringNode stringNode = null;
 
         while (p < end) {
-            CaseFoldCodeItem[]items = enc.caseFoldCodesByString(regex.caseFoldFlag, bytes, p, end);
-            int len = enc.length(bytes, p, end);
+            char[] items = EncodingHelper.caseFoldCodesByString(regex.caseFoldFlag, chars[p]);
 
             if (items.length == 0) {
                 if (stringNode == null) {
@@ -1561,7 +1491,7 @@ final class Analyser extends Parser {
 
                 }
 
-                stringNode.cat(bytes, p, p + len);
+                stringNode.cat(chars, p, p + 1);
             } else {
                 altNum *= (items.length + 1);
                 if (altNum > THRESHOLD_CASE_FOLD_ALT_FOR_EXPANSION) break;
@@ -1570,24 +1500,15 @@ final class Analyser extends Parser {
                     topRoot = root = ConsAltNode.listAdd(null, prevNode.p);
                 }
 
-                if (expandCaseFoldStringAlt(items.length, items, bytes, p, len, end, prevNode)) { // if (r == 1)
-                    if (root == null) {
-                        topRoot = (ConsAltNode)prevNode.p;
-                    } else {
-                        ConsAltNode.listAdd(root, prevNode.p);
-                    }
-
-                    root = (ConsAltNode)((ConsAltNode)prevNode.p).car;
-                } else { /* r == 0 */
-                    if (root != null) ConsAltNode.listAdd(root, prevNode.p);
-                }
+                expandCaseFoldStringAlt(items.length, items, chars, p, 1, end, prevNode);
+                if (root != null) ConsAltNode.listAdd(root, prevNode.p);
                 stringNode = null;
             }
-            p += len;
+            p++;
         }
 
         if (p < end) {
-            Node srem = expandCaseFoldMakeRemString(bytes, p, end);
+            Node srem = expandCaseFoldMakeRemString(chars, p, end);
 
             if (prevNode.p != null && root == null) {
                 topRoot = root = ConsAltNode.listAdd(null, prevNode.p);
@@ -1826,7 +1747,7 @@ final class Analyser extends Parser {
                         StringNode str = qn.convertToString(sn.flag);
                         int n = qn.lower;
                         for (int i = 0; i < n; i++) {
-                            str.cat(sn.bytes, sn.p, sn.end);
+                            str.cat(sn.chars, sn.p, sn.end);
                         }
                         break; /* break case NT_QTFR: */
                     }
@@ -1927,7 +1848,7 @@ final class Analyser extends Parser {
             do {
                 optimizeNodeLeft(lin.car, nopt, nenv);
                 nenv.mmd.add(nopt.length);
-                opt.concatLeftNode(nopt, enc);
+                opt.concatLeftNode(nopt);
             } while ((lin = lin.cdr) != null);
             break;
         }
@@ -1952,24 +1873,23 @@ final class Analyser extends Parser {
             int slen = sn.length();
 
             if (!sn.isAmbig()) {
-                opt.exb.concatStr(sn.bytes, sn.p, sn.end, sn.isRaw(), enc);
+                opt.exb.concatStr(sn.chars, sn.p, sn.end, sn.isRaw());
 
                 if (slen > 0) {
-                    opt.map.addChar(sn.bytes[sn.p], enc);
+                    opt.map.addChar(sn.chars[sn.p]);
                 }
 
                 opt.length.set(slen, slen);
             } else {
                 int max;
                 if (sn.isDontGetOptInfo()) {
-                    int n = sn.length(enc);
-                    max = enc.maxLengthDistance() * n;
+                    max = sn.length();
                 } else {
-                    opt.exb.concatStr(sn.bytes, sn.p, sn.end, sn.isRaw(), enc);
+                    opt.exb.concatStr(sn.chars, sn.p, sn.end, sn.isRaw());
                     opt.exb.ignoreCase = true;
 
                     if (slen > 0) {
-                        opt.map.addCharAmb(sn.bytes, sn.p, sn.end, enc, oenv.caseFoldFlag);
+                        opt.map.addCharAmb(sn.chars, sn.p, sn.end, oenv.caseFoldFlag);
                     }
 
                     max = slen;
@@ -1987,14 +1907,12 @@ final class Analyser extends Parser {
             CClassNode cc = (CClassNode)node;
             /* no need to check ignore case. (setted in setup_tree()) */
             if (cc.mbuf != null || cc.isNot()) {
-                int min = enc.minLength();
-                int max = enc.maxLengthDistance();
-                opt.length.set(min, max);
+                opt.length.set(1, 1);
             } else {
                 for (int i=0; i<BitSet.SINGLE_BYTE_SIZE; i++) {
                     boolean z = cc.bs.at(i);
                     if ((z && !cc.isNot()) || (!z && cc.isNot())) {
-                        opt.map.addChar((byte)i, enc);
+                        opt.map.addChar(i);
                     }
                 }
                 opt.length.set(1, 1);
@@ -2004,7 +1922,7 @@ final class Analyser extends Parser {
 
         case NodeType.CTYPE: {
             int min;
-            int max = enc.maxLengthDistance();
+            int max = 1;
             if (max == 1) {
                 min = 1;
                 CTypeNode cn = (CTypeNode)node;
@@ -2013,28 +1931,28 @@ final class Analyser extends Parser {
                 case CharacterType.WORD:
                     if (cn.not) {
                         for (int i=0; i<BitSet.SINGLE_BYTE_SIZE; i++) {
-                            if (!enc.isWord(i)) {
-                                opt.map.addChar((byte)i, enc);
+                            if (!EncodingHelper.isWord(i)) {
+                                opt.map.addChar(i);
                             }
                         }
                     } else {
                         for (int i=0; i<BitSet.SINGLE_BYTE_SIZE; i++) {
-                            if (enc.isWord(i)) {
-                                opt.map.addChar((byte)i, enc);
+                            if (EncodingHelper.isWord(i)) {
+                                opt.map.addChar(i);
                             }
                         }
                     }
                     break;
                 } // inner switch
             } else {
-                min = enc.minLength();
+                min = 1;
             }
             opt.length.set(min, max);
             break;
         }
 
         case NodeType.CANY: {
-            opt.length.set(enc.minLength(), enc.maxLengthDistance());
+            opt.length.set(1, 1);
             break;
         }
 
@@ -2128,7 +2046,7 @@ final class Analyser extends Parser {
                         if (nopt.exb.reachEnd) {
                             int i;
                             for (i = 2; i <= qn.lower && !opt.exb.isFull(); i++) {
-                                opt.exb.concat(nopt.exb, enc);
+                                opt.exb.concat(nopt.exb);
                             }
                             if (i < qn.lower) {
                                 opt.exb.reachEnd = false;
@@ -2199,7 +2117,6 @@ final class Analyser extends Parser {
         NodeOptInfo opt = new NodeOptInfo();
         OptEnvironment oenv = new OptEnvironment();
 
-        oenv.enc = regex.enc;
         oenv.options = regex.options;
         oenv.caseFoldFlag = regex.caseFoldFlag;
         oenv.scanEnv = env;
@@ -2221,7 +2138,7 @@ final class Analyser extends Parser {
         }
 
         if (opt.exb.length > 0 || opt.exm.length > 0) {
-            opt.exb.select(opt.exm, enc);
+            opt.exb.select(opt.exm);
             if (opt.map.value > 0 && opt.exb.compare(opt.map) > 0) {
                 // !goto set_map;!
                 regex.setOptimizeMapInfo(opt.map);

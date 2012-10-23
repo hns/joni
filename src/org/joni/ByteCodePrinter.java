@@ -19,7 +19,6 @@
  */
 package org.joni;
 
-import org.jcodings.Encoding;
 import org.joni.ast.CClassNode;
 import org.joni.constants.Arguments;
 import org.joni.constants.OPCode;
@@ -29,11 +28,10 @@ import org.joni.exception.InternalException;
 class ByteCodePrinter {
     final int[]code;
     final int codeLength;
-    final byte[][] templates;
+    final char[][] templates;
 
     Object[]operands;
     int operantCount;
-    Encoding enc;
     WarnCallback warnings;
 
     public ByteCodePrinter(Regex regex) {
@@ -43,7 +41,6 @@ class ByteCodePrinter {
         operantCount = regex.operandLength;
 
         templates = regex.templates;
-        enc = regex.enc;
         warnings = regex.warnings;
     }
 
@@ -67,7 +64,7 @@ class ByteCodePrinter {
         while (x-- > 0) sb.append(new String(new byte[]{(byte)code[s++]}));
     }
 
-    private void pLenStringFromTemplate(StringBuilder sb, int len, int mbLen, byte[]tm, int idx) {
+    private void pLenStringFromTemplate(StringBuilder sb, int len, int mbLen, char[] tm, int idx) {
         int x = len * mbLen;
         sb.append(":T:" + len + ":");
         while (x-- > 0) sb.append(new String(new byte[]{(byte)tm[idx++]}));
@@ -222,7 +219,7 @@ class ByteCodePrinter {
                     bp += OPSize.INDEX;
                     sb.append(":T:" + mbLen + ":" + len + ":");
 
-                    while (n-- > 0) sb.append(new String(new byte[]{templates[tm][idx++]}));
+                    while (n-- > 0) sb.append(new String(new char[]{templates[tm][idx++]}));
                 } else {
                     sb.append(":" + mbLen + ":" + len + ":");
 
@@ -236,9 +233,8 @@ class ByteCodePrinter {
                 final int MAX_CHAR_LENGTH = 6;
                 byte[]bytes = new byte[MAX_CHAR_LENGTH];
                 for (int i = 0; bp + i < code.length && i < MAX_CHAR_LENGTH; i++) bytes[i] = (byte)code[bp + i];
-                len = enc.length(bytes, 0, MAX_CHAR_LENGTH);
-                pString(sb, len, bp);
-                bp += len;
+                pString(sb, 1, bp);
+                bp++;
                 break;
 
             case OPCode.EXACTN_IC:

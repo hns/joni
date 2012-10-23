@@ -24,9 +24,9 @@ import static org.joni.BitStatus.bsOnOff;
 import static org.joni.Option.isDontCaptureGroup;
 import static org.joni.Option.isIgnoreCase;
 
-import org.jcodings.Ptr;
-import org.jcodings.constants.CharacterType;
-import org.jcodings.constants.PosixBracket;
+import org.joni.encoding.CharacterType;
+import org.joni.encoding.PosixBracket;
+import org.joni.encoding.Ptr;
 import org.joni.ast.AnchorNode;
 import org.joni.ast.AnyCharNode;
 import org.joni.ast.BackRefNode;
@@ -54,8 +54,8 @@ class Parser extends Lexer {
     protected int returnCode; // return code used by parser methods (they itself return parsed nodes)
                               // this approach will not affect recursive calls
 
-    protected Parser(ScanEnvironment env, byte[]bytes, int p, int end) {
-        super(env, bytes, p, end);
+    protected Parser(ScanEnvironment env, char[] chars, int p, int end) {
+        super(env, chars, p, end);
         regex = env.reg;
     }
 
@@ -68,7 +68,7 @@ class Parser extends Lexer {
 
     private static final int POSIX_BRACKET_NAME_MIN_LEN            = 4;
     private static final int POSIX_BRACKET_CHECK_LIMIT_LENGTH      = 20;
-    private static final byte BRACKET_END[]                        = ":]".getBytes();
+    private static final char BRACKET_END[]                        = ":]".toCharArray();
     private boolean parsePosixBracket(CClassNode cc) {
         mark();
 
@@ -79,14 +79,14 @@ class Parser extends Lexer {
         } else {
             not = false;
         }
-        if (enc.strLength(bytes, p, stop) >= POSIX_BRACKET_NAME_MIN_LEN + 3) { // else goto not_posix_bracket
-            byte[][] pbs= PosixBracket.PBSNamesLower;
+        if (stop - p >= POSIX_BRACKET_NAME_MIN_LEN + 3) { // else goto not_posix_bracket
+            char[][] pbs = PosixBracket.PBSNamesLower;
             for (int i=0; i<pbs.length; i++) {
-                byte[]name = pbs[i];
+                char[] name = pbs[i];
                 // hash lookup here ?
-                if (enc.strNCmp(bytes, p, stop, name, 0, name.length) == 0) {
-                    p = enc.step(bytes, p, stop, name.length);
-                    if (enc.strNCmp(bytes, p, stop, BRACKET_END, 0, BRACKET_END.length) != 0) {
+                if (EncodingHelper.strNCmp(chars, p, stop, name, 0, name.length) == 0) {
+                    p += name.length;
+                    if (EncodingHelper.strNCmp(chars, p, stop, BRACKET_END, 0, BRACKET_END.length) != 0) {
                         newSyntaxException(ERR_INVALID_POSIX_BRACKET_TYPE);
                     }
                     cc.addCType(PosixBracket.PBSValues[i], not, env, this);
@@ -178,20 +178,10 @@ class Parser extends Lexer {
             switch (token.type) {
 
             case CHAR:
-                final int len;
-                if (Config.VANILLA) {
-                    len = enc.codeToMbcLength(token.getC());
-                    if (len > 1) {
-                        arg.inType = CCVALTYPE.CODE_POINT;
-                    } else {
-                        arg.inType = CCVALTYPE.SB; // sb_char:
-                    }
+                if (token.getC() > 0xff) {
+                    arg.inType = CCVALTYPE.CODE_POINT;
                 } else {
-                    if (token.getCode() >= BitSet.SINGLE_BYTE_SIZE || (len = enc.codeToMbcLength(token.getC())) > 1) {
-                        arg.inType = CCVALTYPE.CODE_POINT;
-                    } else {
-                        arg.inType = CCVALTYPE.SB; // sb_char:
-                    }
+                    arg.inType = CCVALTYPE.SB; // sb_char:
                 }
                 arg.v = token.getC();
                 arg.vIsRaw = false;
@@ -199,13 +189,13 @@ class Parser extends Lexer {
                 break;
 
             case RAW_BYTE:
-                if (!enc.isSingleByte() && token.base != 0) { /* tok->base != 0 : octal or hexadec. */
-                    byte[]buf = new byte[Config.ENC_MBC_CASE_FOLD_MAXLEN];
+                if (token.base != 0) { /* tok->base != 0 : octal or hexadec. */
+                    byte[] buf = new byte[4];
                     int psave = p;
                     int base = token.base;
                     buf[0] = (byte)token.getC();
                     int i;
-                    for (i=1; i<enc.maxLength(); i++) {
+                    for (i=1; i<4; i++) {
                         fetchTokenInCC();
                         if (token.type != TokenType.RAW_BYTE || token.base != base) {
                             fetched = true;
@@ -213,21 +203,12 @@ class Parser extends Lexer {
                         }
                         buf[i] = (byte)token.getC();
                     }
-                    if (i < enc.minLength()) newValueException(ERR_TOO_SHORT_MULTI_BYTE_STRING);
 
-                    len = enc.length(buf, 0, i);
-                    if (i < len) {
-                        newValueException(ERR_TOO_SHORT_MULTI_BYTE_STRING);
-                    } else if (i > len) { /* fetch back */
-                        p = psave;
-                        for (i=1; i<len; i++) fetchTokenInCC();
-                        fetched = false;
-                    }
                     if (i == 1) {
                         arg.v = buf[0] & 0xff;
                         arg.inType = CCVALTYPE.SB; // goto raw_single
                     } else {
-                        arg.v = enc.mbcToCode(buf, 0, buf.length);
+                        arg.v = EncodingHelper.mbcToCode(buf, 0, buf.length);
                         arg.inType = CCVALTYPE.CODE_POINT;
                     }
                 } else {
@@ -315,7 +296,7 @@ class Parser extends Lexer {
 
             case CC_CC_OPEN: /* [ */
                 CClassNode acc = parseCharClass();
-                cc.or(acc, enc);
+                cc.or(acc);
                 break;
 
             case CC_AND:     /* && */
@@ -328,7 +309,7 @@ class Parser extends Lexer {
                 andStart = true;
                 arg.state = CCSTATE.START;
                 if (prevCC != null) {
-                    prevCC.and(cc, enc);
+                    prevCC.and(cc);
                 } else {
                     prevCC = cc;
                     if (workCC == null) workCC = new CClassNode();
@@ -355,7 +336,7 @@ class Parser extends Lexer {
         }
 
         if (prevCC != null) {
-            prevCC.and(cc, enc);
+            prevCC.and(cc);
             cc = prevCC;
         }
 
@@ -368,12 +349,8 @@ class Parser extends Lexer {
         if (cc.isNot() && syntax.notNewlineInNegativeCC()) {
             if (!cc.isEmpty()) {
                 final int NEW_LINE = 0x0a;
-                if (enc.isNewLine(NEW_LINE)) {
-                    if (enc.codeToMbcLength(NEW_LINE) == 1) {
-                        cc.bs.set(NEW_LINE);
-                    } else {
-                        cc.addCodeRange(env, NEW_LINE, NEW_LINE);
-                    }
+                if (EncodingHelper.isNewLine(NEW_LINE)) {
+                    cc.bs.set(NEW_LINE);
                 }
             }
         }
@@ -395,8 +372,7 @@ class Parser extends Lexer {
     }
 
     private void parseCharClassValEntry(CClassNode cc, CCStateArg arg) {
-        int len = enc.codeToMbcLength(arg.v);
-        arg.inType = len == 1 ? CCVALTYPE.SB : CCVALTYPE.CODE_POINT;
+        arg.inType = arg.v <= 0xff ? CCVALTYPE.SB : CCVALTYPE.CODE_POINT;
         parseCharClassValEntry2(cc, arg); // val_entry2:
     }
 
@@ -598,7 +574,7 @@ class Parser extends Lexer {
         num = env.addMemEntry();
         if (listCapture && num >= BitStatus.BIT_STATUS_BITS_NUM) newValueException(ERR_GROUP_NUMBER_OVER_FOR_CAPTURE_HISTORY);
 
-        regex.nameAdd(bytes, nm, nameEnd, num, syntax);
+        regex.nameAdd(chars, nm, nameEnd, num, syntax);
         EncloseNode en = new EncloseNode(env.option, true); // node_new_enclose_memory
         en.regNum = num;
 
@@ -615,16 +591,16 @@ class Parser extends Lexer {
         int p = from;
         int i = 0;
         while (p < to) {
-            x = enc.mbcToCode(bytes, p, to);
-            q = p + enc.length(bytes, p, to);
+            x = chars[p];
+            q = p + 1;
             if (x == s[0]) {
                 for (i=1; i<n && q<to; i++) {
-                    x = enc.mbcToCode(bytes, q, to);
+                    x = chars[q];
                     if (x != s[i]) break;
-                    q += enc.length(bytes, q, to);
+                    q++;
                 }
                 if (i >= n) {
-                    if (bytes[nextChar.p] != 0) nextChar.p = q; // we may need zero term semantics...
+                    if (chars[nextChar.p] != 0) nextChar.p = q; // we may need zero term semantics...
                     return p;
                 }
             }
@@ -672,19 +648,18 @@ class Parser extends Lexer {
         case RAW_BYTE:
             return parseExpTkRawByte(group); // tk_raw_byte:
         case CODE_POINT:
-            byte[]buf = new byte[Config.ENC_CODE_TO_MBC_MAXLEN];
-            int num = enc.codeToMbc(token.getCode(), buf, 0);
+            char[] buf = new char[] {(char)token.getCode()};
             // #ifdef NUMBERED_CHAR_IS_NOT_CASE_AMBIG ... // setRaw() #else
-            node = new StringNode(buf, 0, num);
+            node = new StringNode(buf, 0, 1);
             break;
 
         case QUOTE_OPEN:
-            int[]endOp = new int[]{syntax.metaCharTable.esc, 'E'};
+            int[] endOp = new int[] {syntax.metaCharTable.esc, 'E'};
             int qstart = p;
             Ptr nextChar = new Ptr();
             int qend = findStrPosition(endOp, endOp.length, qstart, stop, nextChar);
             if (qend == -1) nextChar.p = qend = stop;
-            node = new StringNode(bytes, qstart, qend);
+            node = new StringNode(chars, qstart, qend);
             p = nextChar.p;
             break;
 
@@ -730,7 +705,7 @@ class Parser extends Lexer {
             node = cc;
             if (isIgnoreCase(env.option)) {
                 ApplyCaseFoldArg arg = new ApplyCaseFoldArg(env, cc);
-                enc.applyAllCaseFold(env.caseFoldFlag, ApplyCaseFold.INSTANCE, arg);
+                EncodingHelper.applyAllCaseFold(env.caseFoldFlag, ApplyCaseFold.INSTANCE, arg);
 
                 if (arg.altRoot != null) {
                     node = ConsAltNode.newAltNode(node, arg.altRoot);
@@ -768,7 +743,7 @@ class Parser extends Lexer {
                     gNum = backrefRelToAbs(gNum);
                     if (gNum <= 0) newValueException(ERR_INVALID_BACKREF);
                 }
-                node = new CallNode(bytes, token.getCallNameP(), token.getCallNameEnd(), gNum);
+                node = new CallNode(chars, token.getCallNameP(), token.getCallNameEnd(), gNum);
                 env.numCall++;
             } // USE_SUBEXP_CALL
             break;
@@ -802,7 +777,7 @@ class Parser extends Lexer {
     }
 
     private Node parseExpTkByte(boolean group) {
-        StringNode node = new StringNode(bytes, token.backP, p); // tk_byte:
+        StringNode node = new StringNode(chars, token.backP, p); // tk_byte:
         while (true) {
             fetchToken();
             if (token.type != TokenType.STRING) break;
@@ -810,7 +785,7 @@ class Parser extends Lexer {
             if (token.backP == node.end) {
                 node.end = p; // non escaped character, remain shared, just increase shared range
             } else {
-                node.cat(bytes, token.backP, p); // non continuous string stream, need to COW
+                node.cat(chars, token.backP, p); // non continuous string stream, need to COW
             }
         }
         // targetp = node;
@@ -823,13 +798,13 @@ class Parser extends Lexer {
         // important: we don't use 0xff mask here neither in the compiler
         // (in the template string) so we won't have to mask target
         // strings when comparing against them in the matcher
-        StringNode node = new StringNode((byte)token.getC());
+        StringNode node = new StringNode((char)token.getC());
         node.setRaw();
 
         int len = 1;
         while (true) {
-            if (len >= enc.minLength()) {
-                if (len == enc.length(node.bytes, node.p, node.end)) {
+            if (len >= 1) {
+                if (len == 1) {
                     fetchToken();
                     node.clearRaw();
                     // !goto string_end;!
@@ -848,7 +823,7 @@ class Parser extends Lexer {
             // important: we don't use 0xff mask here neither in the compiler
             // (in the template string) so we won't have to mask target
             // strings when comparing against them in the matcher
-            node.cat((byte)token.getC());
+            node.cat((char)token.getC());
             len++;
         } // while
     }
@@ -862,7 +837,7 @@ class Parser extends Lexer {
                                                      token.type == TokenType.INTERVAL);
 
             qtfr.greedy = token.getRepeatGreedy();
-            int ret = qtfr.setQuantifier(target, group, env, bytes, getBegin(), getEnd());
+            int ret = qtfr.setQuantifier(target, group, env, chars, getBegin(), getEnd());
             Node qn = qtfr;
 
             if (token.getRepeatPossessive()) {
@@ -894,7 +869,7 @@ class Parser extends Lexer {
                                                      token.type == TokenType.INTERVAL);
 
             qtfr.greedy = token.getRepeatGreedy();
-            int ret = qtfr.setQuantifier(target.car, group, env, bytes, getBegin(), getEnd());
+            int ret = qtfr.setQuantifier(target.car, group, env, chars, getBegin(), getEnd());
             Node qn = qtfr;
 
             if (token.getRepeatPossessive()) {

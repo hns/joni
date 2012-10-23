@@ -23,14 +23,10 @@ import static org.joni.BitStatus.bsAt;
 import static org.joni.Option.isCaptureGroup;
 import static org.joni.Option.isDontCaptureGroup;
 
+import java.util.HashMap;
 import java.util.IllegalFormatConversionException;
 import java.util.Iterator;
 
-import org.jcodings.Encoding;
-import org.jcodings.EncodingDB;
-import org.jcodings.specific.ASCIIEncoding;
-import org.jcodings.specific.UTF8Encoding;
-import org.jcodings.util.BytesHash;
 import org.joni.constants.AnchorType;
 import org.joni.constants.RegexState;
 import org.joni.exception.ErrorMessages;
@@ -63,14 +59,13 @@ public final class Regex implements RegexState {
     public WarnCallback warnings;
     public MatcherFactory factory;
 
-    final Encoding enc;
     int options;
     int userOptions;
     Object userObject;
     //final Syntax syntax;
     final int caseFoldFlag;
 
-    BytesHash<NameEntry> nameTable;        // named entries
+    HashMap<String,NameEntry> nameTable;        // named entries
 
     /* optimization info (string search, char-map and anchors) */
     SearchAlgorithm searchAlgorithm;        /* optimize flag */
@@ -80,67 +75,55 @@ public final class Regex implements RegexState {
     int anchorDmax;                         /* (SEMI_)END_BUF anchor distance */
     int subAnchor;                          /* start-anchor for exact or map */
 
-    byte[]exact;
+    char[] exact;
     int exactP;
     int exactEnd;
 
-    byte[]map;                              /* used as BM skip or char-map */
-    int[]intMap;                            /* BM skip for exact_len > 255 */
-    int[]intMapBackward;                    /* BM skip for backward search */
+    byte[] map;                              /* used as BM skip or char-map */
+    int[] intMap;                            /* BM skip for exact_len > 255 */
+    int[] intMapBackward;                    /* BM skip for backward search */
     int dMin;                               /* min-distance of exact or map */
     int dMax;                               /* max-distance of exact or map */
 
-    byte[][]templates;
+    char[][] templates;
     int templateNum;
 
     public Regex(CharSequence cs) {
         this(cs.toString());
     }
 
-    public Regex(CharSequence cs, Encoding enc) {
-        this(cs.toString(), enc);
-    }
-
     public Regex(String str) {
-        this(str.getBytes(), 0, str.length(), 0, UTF8Encoding.INSTANCE);
+        this(str.toCharArray(), 0, str.length(), 0);
     }
 
-    public Regex(String str, Encoding enc) {
-        this(str.getBytes(), 0, str.length(), 0, enc);
+    public Regex(char[] chars) {
+        this(chars, 0, chars.length, 0);
     }
 
-    public Regex(byte[] bytes) {
-        this(bytes, 0, bytes.length, 0, ASCIIEncoding.INSTANCE);
+    public Regex(char[] chars, int p, int end) {
+        this(chars, p, end, 0);
     }
 
-    public Regex(byte[] bytes, int p, int end) {
-        this(bytes, p, end, 0, ASCIIEncoding.INSTANCE);
-    }
-
-    public Regex(byte[] bytes, int p, int end, int option) {
-        this(bytes, p, end, option, ASCIIEncoding.INSTANCE);
-    }
-
-    public Regex(byte[]bytes, int p, int end, int option, Encoding enc) {
-        this(bytes, p, end, option, enc, Syntax.RUBY, WarnCallback.DEFAULT);
+    public Regex(char[] chars, int p, int end, int option) {
+        this(chars, p, end, option, Syntax.RUBY, WarnCallback.DEFAULT);
     }
 
     // onig_new
-    public Regex(byte[]bytes, int p, int end, int option, Encoding enc, Syntax syntax) {
-        this(bytes, p, end, option, Config.ENC_CASE_FOLD_DEFAULT, enc, syntax, WarnCallback.DEFAULT);
+    public Regex(char[] chars, int p, int end, int option, Syntax syntax) {
+        this(chars, p, end, option, Config.ENC_CASE_FOLD_DEFAULT, syntax, WarnCallback.DEFAULT);
     }
 
-    public Regex(byte[]bytes, int p, int end, int option, Encoding enc, WarnCallback warnings) {
-        this(bytes, p, end, option, enc, Syntax.RUBY, warnings);
+    public Regex(char[]chars, int p, int end, int option, WarnCallback warnings) {
+        this(chars, p, end, option, Syntax.RUBY, warnings);
     }
 
     // onig_new
-    public Regex(byte[]bytes, int p, int end, int option, Encoding enc, Syntax syntax, WarnCallback warnings) {
-        this(bytes, p, end, option, Config.ENC_CASE_FOLD_DEFAULT, enc, syntax, warnings);
+    public Regex(char[] chars, int p, int end, int option, Syntax syntax, WarnCallback warnings) {
+        this(chars, p, end, option, Config.ENC_CASE_FOLD_DEFAULT, syntax, warnings);
     }
 
     // onig_alloc_init
-    public Regex(byte[]bytes, int p, int end, int option, int caseFoldFlag, Encoding enc, Syntax syntax, WarnCallback warnings) {
+    public Regex(char[] chars, int p, int end, int option, int caseFoldFlag, Syntax syntax, WarnCallback warnings) {
 
         if ((option & (Option.DONT_CAPTURE_GROUP | Option.CAPTURE_GROUP)) ==
             (Option.DONT_CAPTURE_GROUP | Option.CAPTURE_GROUP)) {
@@ -154,22 +137,21 @@ public final class Regex implements RegexState {
             option |= syntax.options;
         }
 
-        this.enc = enc;
         this.options = option;
         this.caseFoldFlag = caseFoldFlag;
         this.warnings = warnings;
 
-        new Analyser(new ScanEnvironment(this, syntax), bytes, p, end).compile();
+        new Analyser(new ScanEnvironment(this, syntax), chars, p, end).compile();
 
         this.warnings = null;
     }
 
-    public Matcher matcher(byte[]bytes) {
-        return matcher(bytes, 0, bytes.length);
+    public Matcher matcher(char[] chars) {
+        return matcher(chars, 0, chars.length);
     }
 
-    public Matcher matcher(byte[]bytes, int p, int end) {
-        return factory.create(this, bytes, p, end);
+    public Matcher matcher(char[] chars, int p, int end) {
+        return factory.create(this, chars, p, end);
     }
 
     public int numberOfCaptures() {
@@ -193,7 +175,7 @@ public final class Regex implements RegexState {
 
         if (nameTable != null) {
             sb.append("name table\n");
-            for (NameEntry ne : nameTable) {
+            for (NameEntry ne : nameTable.values()) {
                 sb.append("  " + ne + "\n");
             }
             sb.append("\n");
@@ -201,14 +183,14 @@ public final class Regex implements RegexState {
         return sb.toString();
     }
 
-    NameEntry nameFind(byte[]name, int nameP, int nameEnd) {
-        if (nameTable != null) return nameTable.get(name, nameP, nameEnd);
+    NameEntry nameFind(char[] name, int nameP, int nameEnd) {
+        if (nameTable != null) return nameTable.get(new String(name, nameP, nameEnd - nameP));
         return null;
     }
 
     void renumberNameTable(int[]map) {
         if (nameTable != null) {
-            for (NameEntry e : nameTable) {
+            for (NameEntry e : nameTable.values()) {
                 if (e.backNum > 1) {
                     for (int i=0; i<e.backNum; i++) {
                         e.backRefs[i] = map[e.backRefs[i]];
@@ -224,12 +206,12 @@ public final class Regex implements RegexState {
         return nameTable == null ? 0 : nameTable.size();
     }
 
-    void nameAdd(byte[]name, int nameP, int nameEnd, int backRef, Syntax syntax) {
+    void nameAdd(char[] name, int nameP, int nameEnd, int backRef, Syntax syntax) {
         if (nameEnd - nameP <= 0) throw new ValueException(ErrorMessages.ERR_EMPTY_GROUP_NAME);
 
         NameEntry e = null;
         if (nameTable == null) {
-            nameTable = new BytesHash<NameEntry>(); // 13, oni defaults to 5
+            nameTable = new HashMap<String,NameEntry>(); // 13, oni defaults to 5
         } else {
             e = nameFind(name, nameP, nameEnd);
         }
@@ -237,7 +219,7 @@ public final class Regex implements RegexState {
         if (e == null) {
             // dup the name here as oni does ?, what for ? (it has to manage it, we don't)
             e = new NameEntry(name, nameP, nameEnd);
-            nameTable.putDirect(name, nameP, nameEnd, e);
+            nameTable.put(new String(name, nameP, nameEnd - nameP), e);
         } else if (e.backNum >= 1 && !syntax.allowMultiplexDefinitionName()) {
             throw new ValueException(ErrorMessages.ERR_MULTIPLEX_DEFINED_NAME, new String(name, nameP, nameEnd - nameP));
         }
@@ -245,11 +227,11 @@ public final class Regex implements RegexState {
         e.addBackref(backRef);
     }
 
-    NameEntry nameToGroupNumbers(byte[]name, int nameP, int nameEnd) {
+    NameEntry nameToGroupNumbers(char[] name, int nameP, int nameEnd) {
         return nameFind(name, nameP, nameEnd);
     }
 
-    public int nameToBackrefNumber(byte[]name, int nameP, int nameEnd, Region region) {
+    public int nameToBackrefNumber(char[] name, int nameP, int nameEnd, Region region) {
         NameEntry e = nameToGroupNumbers(name, nameP, nameEnd);
         if (e == null) throw new ValueException(ErrorMessages.ERR_UNDEFINED_NAME_REFERENCE,
                                                 new String(name, nameP, nameEnd - nameP));
@@ -270,7 +252,7 @@ public final class Regex implements RegexState {
     }
 
     public Iterator<NameEntry> namedBackrefIterator() {
-        return nameTable.iterator();
+        return nameTable.values().iterator();
     }
 
     public boolean noNameGroupIsActive(Syntax syntax) {
@@ -284,7 +266,7 @@ public final class Regex implements RegexState {
 
     /* set skip map for Boyer-Moor search */
     void setupBMSkipMap() {
-        byte[]bytes = exact;
+        char[] chars = exact;
         int p = exactP;
         int end = exactEnd;
         int len = end - p;
@@ -294,11 +276,11 @@ public final class Regex implements RegexState {
             if (map == null) map = new byte[Config.CHAR_TABLE_SIZE];
 
             for (int i=0; i<Config.CHAR_TABLE_SIZE; i++) map[i] = (byte)len;
-            for (int i=0; i<len-1; i++) map[bytes[p + i] & 0xff] = (byte)(len - 1 -i); // oxff ??
+            for (int i=0; i<len-1; i++) map[chars[p + i] & 0xff] = (byte)(len - 1 -i); // oxff ??
         } else {
             if (intMap == null) intMap = new int[Config.CHAR_TABLE_SIZE];
 
-            for (int i=0; i<len-1; i++) intMap[bytes[p + i] & 0xff] = len - 1 - i; // oxff ??
+            for (int i=0; i<len-1; i++) intMap[chars[p + i] & 0xff] = len - 1 - i; // oxff ??
         }
     }
 
@@ -306,25 +288,18 @@ public final class Regex implements RegexState {
         if (e.length == 0) return;
 
         // shall we copy that ?
-        exact = e.bytes;
+        exact = e.chars;
         exactP = 0;
         exactEnd = e.length;
 
         if (e.ignoreCase) {
-            // encodings won't return toLowerTable for case insensitive search if it's not safe to use it directly
-            searchAlgorithm = enc.toLowerCaseTable() != null ? SearchAlgorithm.SLOW_IC_SB : new SearchAlgorithm.SLOW_IC(this);
+            searchAlgorithm = new SearchAlgorithm.SLOW_IC(this);
         } else {
-            boolean allowReverse = enc.isReverseMatchAllowed(exact, exactP, exactEnd);
-
-            if (e.length >= 3 || (e.length >= 2 && allowReverse)) {
+            if (e.length >= 2) {
                 setupBMSkipMap();
-                if (allowReverse) {
-                    searchAlgorithm = SearchAlgorithm.BM;
-                } else {
-                    searchAlgorithm = SearchAlgorithm.BM_NOT_REV;
-                }
+                searchAlgorithm = SearchAlgorithm.BM;
             } else {
-                searchAlgorithm = enc.isSingleByte() ? SearchAlgorithm.SLOW_SB : SearchAlgorithm.SLOW;
+                searchAlgorithm = SearchAlgorithm.SLOW;
             }
         }
 
@@ -339,7 +314,7 @@ public final class Regex implements RegexState {
     void setOptimizeMapInfo(OptMapInfo m) {
         map = m.map;
 
-        searchAlgorithm = enc.isSingleByte() ? SearchAlgorithm.MAP_SB : SearchAlgorithm.MAP;
+        searchAlgorithm = SearchAlgorithm.MAP;
         dMin = m.mmd.min;
         dMax = m.mmd.max;
 
@@ -367,26 +342,9 @@ public final class Regex implements RegexState {
     public String encStringToString(byte[]bytes, int p, int end) {
         StringBuilder sb = new StringBuilder("\nPATTERN: /");
 
-        if (enc.minLength() > 1) {
-            int p_ = p;
-            while (p_ < end) {
-                int code = enc.mbcToCode(bytes, p_, end);
-                if (code >= 0x80) {
-                    try {
-                        sb.append(String.format(" 0x%04x ", code));
-                    } catch (IllegalFormatConversionException ifce) {
-                        sb.append(code);
-                    }
-                } else {
-                    sb.append((char)code);
-                }
-                p_ += enc.length(bytes, p_, end);
-            }
-        } else {
-            while (p < end) {
-                sb.append(new String(new byte[]{bytes[p]}));
-                p++;
-            }
+        while (p < end) {
+            sb.append(new String(new byte[]{bytes[p]}));
+            p++;
         }
         return sb.append("/").toString();
     }
@@ -411,7 +369,7 @@ public final class Regex implements RegexState {
 
         if (exact != null) {
             s += "exact: [" + new String(exact, exactP, exactEnd - exactP) + "]: length: " + (exactEnd - exactP) + "\n";
-        } else if (searchAlgorithm == SearchAlgorithm.MAP || searchAlgorithm == SearchAlgorithm.MAP_SB) {
+        } else if (searchAlgorithm == SearchAlgorithm.MAP) {
             int n=0;
             for (int i=0; i<Config.CHAR_TABLE_SIZE; i++) if (map[i] != 0) n++;
 
@@ -423,8 +381,8 @@ public final class Regex implements RegexState {
                     if (map[i] != 0) {
                         if (c > 0) s += ", ";
                         c++;
-                        if (enc.maxLength() == 1 && enc.isPrint(i)) s += ((char)i);
-                        else s += i;
+                        // TODO if (enc.isPrint(i)
+                        s += ((char)i);
                     }
                 }
                 s += "]\n";
@@ -432,10 +390,6 @@ public final class Regex implements RegexState {
         }
 
         return s;
-    }
-
-    public Encoding getEncoding() {
-        return enc;
     }
 
     public int getOptions() {

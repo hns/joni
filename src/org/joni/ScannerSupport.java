@@ -19,17 +19,15 @@
  */
 package org.joni;
 
-import org.jcodings.Encoding;
-import org.jcodings.IntHolder;
+import org.joni.encoding.IntHolder;
 import org.joni.exception.ErrorMessages;
 import org.joni.exception.InternalException;
 import org.joni.exception.SyntaxException;
 import org.joni.exception.ValueException;
 
 abstract class ScannerSupport extends IntHolder implements ErrorMessages {
-    protected final Encoding enc;       // fast access to encoding
 
-    protected final byte[]bytes;        // pattern
+    protected final char[] chars;       // pattern
     protected int p;                    // current scanner position
     protected int stop;                 // pattern end (mutable)
     private int lastFetched;            // last fetched value for unfetch support
@@ -39,10 +37,8 @@ abstract class ScannerSupport extends IntHolder implements ErrorMessages {
     private final int end;              // pattern end position for reset() support
     protected int _p;                   // used by mark()/restore() to mark positions
 
-    protected ScannerSupport(Encoding enc, byte[]bytes, int p, int end) {
-        this.enc = enc;
-
-        this.bytes = bytes;
+    protected ScannerSupport(char[] chars, int p, int end) {
+        this.chars = chars;
         this.begin = p;
         this.end = end;
 
@@ -64,9 +60,9 @@ abstract class ScannerSupport extends IntHolder implements ErrorMessages {
         int num = 0; // long ???
         while(left()) {
             fetch();
-            if (enc.isDigit(c)) {
+            if (Character.isDigit(c)) {
                 int onum = num;
-                num = num * 10 + Encoding.digitVal(c);
+                num = num * 10 + EncodingHelper.digitVal(c);
                 if (((onum ^ num) & INT_SIGN_BIT) != 0) return -1;
             } else {
                 unfetch();
@@ -82,9 +78,9 @@ abstract class ScannerSupport extends IntHolder implements ErrorMessages {
         int num = 0;
         while(left() && maxLength-- != 0) {
             fetch();
-            if (enc.isXDigit(c)) {
+            if (EncodingHelper.isXDigit(c)) {
                 int onum = num;
-                int val = enc.xdigitVal(c);
+                int val = EncodingHelper.xdigitVal(c);
                 num = (num << 4) + val;
                 if (((onum ^ num) & INT_SIGN_BIT) != 0) return -1;
             } else {
@@ -101,9 +97,9 @@ abstract class ScannerSupport extends IntHolder implements ErrorMessages {
         int num = 0;
         while(left() && maxLength-- != 0) {
             fetch();
-            if (enc.isDigit(c) && c < '8') {
+            if (Character.isDigit(c) && c < '8') {
                 int onum = num;
-                int val = Encoding.odigitVal(c);
+                int val = EncodingHelper.odigitVal(c);
                 num = (num << 3) + val;
                 if (((onum ^ num) & INT_SIGN_BIT) != 0) return -1;
             } else {
@@ -130,20 +126,17 @@ abstract class ScannerSupport extends IntHolder implements ErrorMessages {
 
     protected final void inc() {
         lastFetched = p;
-        p += enc.length(bytes, p, stop);
+        p++;
     }
 
     protected final void fetch() {
-        c = enc.mbcToCode(bytes, p, stop);
         lastFetched = p;
-        p += enc.length(bytes, p, stop);
+        c = chars[p++];
     }
 
     protected int fetchTo() {
-        int to = enc.mbcToCode(bytes, p, stop);
         lastFetched = p;
-        p += enc.length(bytes, p, stop);
-        return to;
+        return chars[p++];
     }
 
     protected final void unfetch() {
@@ -151,7 +144,7 @@ abstract class ScannerSupport extends IntHolder implements ErrorMessages {
     }
 
     protected final int peek() {
-        return p < stop ? enc.mbcToCode(bytes, p, stop) : 0;
+        return p < stop ? chars[p] : 0;
     }
 
     protected final boolean peekIs(int c) {
@@ -175,7 +168,7 @@ abstract class ScannerSupport extends IntHolder implements ErrorMessages {
     }
 
     protected void newValueException(String message, int p, int end) {
-        throw new ValueException(message, new String(bytes, p, end - p));
+        throw new ValueException(message, new String(chars, p, end - p));
     }
 
     protected void newInternalException(String message) {

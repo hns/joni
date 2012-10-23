@@ -60,8 +60,8 @@ final class AsmCompiler extends AsmCompilerSupport {
     }
 
     @Override
-    protected void addCompileString(byte[]bytes, int p, int mbLength, int strLength, boolean ignoreCase) {
-        String template = installTemplate(bytes, p, strLength);
+    protected void addCompileString(char[] chars, int p, int mbLength, int strLength, boolean ignoreCase) {
+        String template = installTemplate(chars, p, strLength);
     }
 
     @Override
