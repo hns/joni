@@ -59,8 +59,8 @@ public class EncodingHelper {
     }
 
     public static boolean isWord(int code) {
-        // alphanumeric or '_'
-        return code < 0x80 && (1 << Character.getType(code) & CharacterType.WORD_MASK) != 0;
+        // letter, digit, or '_'
+        return (1 << Character.getType(code) & CharacterType.WORD_MASK) != 0;
     }
 
     public static boolean isNewLine(int code) {
