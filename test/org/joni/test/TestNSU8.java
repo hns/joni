@@ -22,10 +22,21 @@ package org.joni.test;
 import org.joni.Option;
 import org.joni.Syntax;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+
 public class TestNSU8 extends Test {
 
     public int option() {
         return Option.DEFAULT;
+    }
+
+    public Charset encoding() {
+        return StandardCharsets.UTF_8;
+    }
+
+    public Charset testEncoding() {
+        return StandardCharsets.UTF_8;
     }
 
     public Syntax syntax() {
@@ -33,7 +44,20 @@ public class TestNSU8 extends Test {
     }
 
     public void test() {
+        xx("([^\\[\\]]+)".toCharArray(), new String(new byte[]{(byte)240, (byte)32, (byte)32, (byte)32, (byte)32}, testEncoding()).toCharArray(), 0, 5, 1, false);
+        xx("([^\\[\\]]+)".toCharArray(), new String(new byte[]{(byte)240, (byte)32, (byte)32, (byte)32}, testEncoding()).toCharArray(), 0, 4, 1, false);
+        xx("([^\\[\\]]+)".toCharArray(), new String(new byte[]{(byte)240, (byte)32, (byte)32}, testEncoding()).toCharArray(), 0, 3, 1, false);
+        xx("([^\\[\\]]+)".toCharArray(), new String(new byte[]{(byte)240, (byte)32}, testEncoding()).toCharArray(), 0, 2, 1, false);
+        xx("([^\\[\\]]+)".toCharArray(), new String(new byte[]{(byte)240}, testEncoding()).toCharArray(), 0, 1, 1, false);
 
+        xx("([^\\[\\]]+)".toCharArray(), new String(new byte[]{(byte)224, (byte)32, (byte)32, (byte)32}, testEncoding()).toCharArray(), 0, 4, 1, false);
+        xx("([^\\[\\]]+)".toCharArray(), new String(new byte[]{(byte)224, (byte)32, (byte)32}, testEncoding()).toCharArray(), 0, 3, 1, false);
+        xx("([^\\[\\]]+)".toCharArray(), new String(new byte[]{(byte)224, (byte)32}, testEncoding()).toCharArray(), 0, 2, 1, false);
+        xx("([^\\[\\]]+)".toCharArray(), new String(new byte[]{(byte)224}, testEncoding()).toCharArray(), 0, 1, 1, false);
+
+        xx("([^\\[\\]]+)".toCharArray(), new String(new byte[]{(byte)192, (byte)32, (byte)32}, testEncoding()).toCharArray(), 0, 3, 1, false);
+        xx("([^\\[\\]]+)".toCharArray(), new String(new byte[]{(byte)192, (byte)32}, testEncoding()).toCharArray(), 0, 2, 1, false);
+        xx("([^\\[\\]]+)".toCharArray(), new String(new byte[]{(byte)192}, testEncoding()).toCharArray(), 0, 1, 1, false);
     }
 
     public static void main(String[] args) throws Throwable {

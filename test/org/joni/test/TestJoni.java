@@ -57,9 +57,9 @@ public class TestJoni extends TestCase {
     }
 
     public void testUnicode() {
-        // testJoniTest(testu);
-        // testJoniTest(testnsu8);
-        // testJoniTest(testu8);
+        testJoniTest(testu);
+        testJoniTest(testnsu8);
+        testJoniTest(testu8);
     }
 
     public void testLookBehind() {

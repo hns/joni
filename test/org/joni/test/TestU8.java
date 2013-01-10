@@ -22,10 +22,21 @@ package org.joni.test;
 import org.joni.Option;
 import org.joni.Syntax;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+
 public class TestU8 extends Test {
 
     public int option() {
         return Option.DEFAULT;
+    }
+
+    public Charset encoding() {
+        return StandardCharsets.UTF_8;
+    }
+
+    public Charset testEncoding() {
+        return StandardCharsets.ISO_8859_1;
     }
 
     public Syntax syntax() {
@@ -33,15 +44,34 @@ public class TestU8 extends Test {
     }
 
     public void test() {
+        xxs("^\\d\\d\\d-", new String(new byte []{-30, -126, -84, 48, 45}, encoding()), 0, 0, 0, true);
         x2s("x{2}", "xx", 0, 2, Option.IGNORECASE);
         x2s("x{2}", "XX", 0, 2, Option.IGNORECASE);
         x2s("x{3}", "XxX", 0, 3, Option.IGNORECASE);
         ns("x{2}", "x", Option.IGNORECASE);
         ns("x{2}", "X", Option.IGNORECASE);
 
+        String pat = new String(new byte[] {(byte)227, (byte)131, (byte)160, (byte)40, (byte)46, (byte)41}, testEncoding());
+        String str = new String(new byte[]{(byte)227, (byte)130, (byte)185, (byte)227, (byte)131, (byte)145, (byte)227, (byte)131, (byte)160, (byte)227, (byte)131, (byte)143, (byte)227, (byte)131, (byte)179, (byte)227, (byte)130, (byte)175}, testEncoding());
+
+        x2s(pat, str, 6, 12);
+
         x2s("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0, 35, Option.IGNORECASE);
         x2s("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", 0, 35, Option.IGNORECASE);
         x2s("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaaaaaAAAAAAAAAAAAAAAAA", 0, 35, Option.IGNORECASE);
+
+        pat = new String(new byte[]{94, 40, (byte)239, (byte)188, (byte)161, 41, 92, 49, 36}, testEncoding());
+        str = new String(new byte[]{(byte)239, (byte)188, (byte)161, 65}, testEncoding());
+
+        ns(pat, str, Option.IGNORECASE);
+
+        pat = new String(new byte[]{94, (byte)195, (byte)159, 123, 50, 125, 36}, testEncoding());
+        str = new String(new byte[]{(byte)195, (byte)159, 115, 115}, testEncoding());
+
+        // x2s(pat, str, 0, 4, Option.IGNORECASE);
+
+        String str2 = new String(new byte[]{-61, -123, -61, -123});
+        String pat2 = new String(new byte[]{'^', -61, -123, '{', '2', '}', '$'});
 
         // x2s(pat2, str2, 4, 4);
         // x2s(pat2, str2, 4, 4, Option.IGNORECASE);

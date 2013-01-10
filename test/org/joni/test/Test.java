@@ -27,6 +27,8 @@ import org.joni.Region;
 import org.joni.Syntax;
 import org.joni.exception.JOniException;
 
+import java.nio.charset.Charset;
+
 public abstract class Test {
     static final boolean VERBOSE = false;
 
@@ -35,14 +37,16 @@ public abstract class Test {
     int nfail;
 
     public abstract int option();
+    public abstract Charset encoding();
+    public abstract Charset testEncoding();
     public abstract Syntax syntax();
 
-    protected String repr(char[] bytes) {
-        return new String(bytes);
+    protected String repr(char[] chars) {
+        return new String(chars, 0, length(chars));
     }
 
-    protected int length(char[] bytes) {
-        return bytes.length;
+    protected int length(char[] chars) {
+        return chars.length;
     }
 
     public void xx(char[]pattern, char[]str, int from, int to, int mem, boolean not) {
@@ -95,6 +99,7 @@ public abstract class Test {
                 nsucc++;
             } else {
                 Config.log.println("FAIL: /" + repr(pattern) + "/ '" + repr(str) + "'");
+                Thread.dumpStack();
                 nfail++;
             }
         } else {
@@ -140,7 +145,13 @@ public abstract class Test {
     }
 
     public void xxs(String pattern, String str, int from, int to, int mem, boolean not, int option) {
-        xx(pattern.toCharArray(), str.toCharArray(), from, to, mem, not, option);
+        // Re-encode string using the test's encoding and translate result indices.
+        String pattern2 = new String(pattern.getBytes(testEncoding()), encoding());
+        byte[] strBytes = str.getBytes(testEncoding());
+        String str2 = new String(strBytes, encoding());
+        int from2 = from == 0 ? 0 : new String(strBytes, 0, from, encoding()).length();
+        int to2 = to == 0 ? 0 : new String(strBytes, 0, to, encoding()).length();
+        xx(pattern2.toCharArray(), str2.toCharArray(), from2, to2, mem, not, option);
     }
 
     public void x2s(String pattern, String str, int from, int to) {
@@ -148,7 +159,7 @@ public abstract class Test {
     }
 
     public void x2s(String pattern, String str, int from, int to, int option) {
-        xx(pattern.toCharArray(), str.toCharArray(), from, to, 0, false, option);
+        xxs(pattern, str, from, to, 0, false, option);
     }
 
     public void x3s(String pattern, String str, int from, int to, int mem) {
@@ -156,7 +167,7 @@ public abstract class Test {
     }
 
     public void x3s(String pattern, String str, int from, int to, int mem, int option) {
-        xx(pattern.toCharArray(), str.toCharArray(), from, to, mem, false, option);
+        xxs(pattern, str, from, to, mem, false, option);
     }
 
     public void ns(String pattern, String str) {
@@ -164,7 +175,7 @@ public abstract class Test {
     }
 
     public void ns(String pattern, String str, int option) {
-        xx(pattern.toCharArray(), str.toCharArray(), 0, 0, 0, true, option);
+        xxs(pattern, str, 0, 0, 0, true, option);
     }
 
     public void printResults() {

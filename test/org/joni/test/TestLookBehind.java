@@ -22,10 +22,21 @@ package org.joni.test;
 import org.joni.Option;
 import org.joni.Syntax;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+
 public class TestLookBehind extends Test {
 
 	public int option() {
 		return Option.DEFAULT;
+	}
+
+	public Charset encoding() {
+		return StandardCharsets.US_ASCII;
+	}
+
+	public Charset testEncoding() {
+		return StandardCharsets.ISO_8859_1;
 	}
 
 	public Syntax syntax() {

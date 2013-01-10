@@ -22,12 +22,22 @@ package org.joni.test;
 import org.joni.Config;
 import org.joni.Option;
 import org.joni.Regex;
-import org.joni.Region;
 import org.joni.Syntax;
+
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 public class TestCornerCases extends Test {
     public int option() {
         return Option.DEFAULT;
+    }
+
+    public Charset encoding() {
+        return StandardCharsets.US_ASCII;
+    }
+
+    public Charset testEncoding() {
+        return Charset.forName("cp1250");
     }
 
     public Syntax syntax() {

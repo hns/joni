@@ -23,10 +23,21 @@ import org.joni.Config;
 import org.joni.Option;
 import org.joni.Syntax;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+
 public class TestCrnl extends Test {
 
     public int option() {
         return Option.DEFAULT;
+    }
+
+    public Charset encoding() {
+        return StandardCharsets.US_ASCII;
+    }
+
+    public Charset testEncoding() {
+        return StandardCharsets.US_ASCII;
     }
 
     public Syntax syntax() {
