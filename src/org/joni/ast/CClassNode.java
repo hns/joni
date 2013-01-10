@@ -321,6 +321,12 @@ public final class CClassNode extends Node {
             case CharacterType.S:
             case CharacterType.W:
                 ctype ^= CharacterType.SPECIAL_MASK;
+
+                if (env.syntax == Syntax.JAVASCRIPT && ctype == CharacterType.SPACE) {
+                    // \s in JavaScript includes unicode characters.
+                    break;
+                }
+
                 if (not) {
                     for (int c = 0; c < BitSet.SINGLE_BYTE_SIZE; c++) {
                         // if (!ASCIIEncoding.INSTANCE.isCodeCType(c, ctype)) bs.set(c);
